@@ -5,13 +5,18 @@ echo ======================================================================
 echo   AURA GASGUARD - STREAMING LIVE ESP32 SENSOR DATA TO RENDER CLOUD
 echo ======================================================================
 echo.
-echo [*] Streaming real-time sensor data from ESP32 (COM5) to:
-echo     https://aura-gasguard.onrender.com/api/sensor-data
+echo [*] Live Cloud Target: https://aura-gasguard.onrender.com/api/sensor-data
 echo [*] Opening Live Cloud Dashboard in your browser...
 echo.
 
-start "" "https://aura-gasguard.onrender.com"
+start https://aura-gasguard.onrender.com
 
+set PYTHONUNBUFFERED=1
 set BACKEND_URL=https://aura-gasguard.onrender.com/api/sensor-data
+
 python -u serial_bridge.py
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Python execution exited with an error. Check if pyserial or requests is installed.
+)
 pause
