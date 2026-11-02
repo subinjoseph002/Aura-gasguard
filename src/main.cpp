@@ -46,8 +46,8 @@ const char* AP_SSID       = "ESP32-Gas-Detector";
 const char* AP_PASSWORD   = "12345678";
 
 // Backend Server URL (Requirement 2: Data Communication to Backend)
-// Change to your PC / Docker host IP on your local Wi-Fi:
-const char* BACKEND_SERVER_URL = "http://192.168.1.100:5000/api/sensor-data";
+// Deployed production cloud URL on Render:
+const char* BACKEND_SERVER_URL = "https://aura-gasguard.onrender.com/api/sensor-data";
 
 WebServer server(80);
 
