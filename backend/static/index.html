@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Aura GasGuard • IoT Hardware Sentinel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --border: #e2e8f0;
+      --border-focus: #6366f1;
+
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+
+      --safe: #059669;
+      --safe-bg: #ecfdf5;
+      --safe-border: #a7f3d0;
+      --safe-glow: rgba(16, 185, 129, 0.4);
+
+      --warn: #d97706;
+      --warn-bg: #fffbeb;
+      --warn-border: #fde68a;
+      --warn-glow: rgba(245, 158, 11, 0.4);
+
+      --danger: #dc2626;
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --danger-glow: rgba(239, 68, 68, 0.4);
+
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --cyan: #0891b2;
+
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-hover: 0 12px 24px -4px rgba(0, 0, 0, 0.08), 0 4px 8px -2px rgba(0, 0, 0, 0.04);
+      --shadow-active: 0 0 0 2px rgba(79, 70, 229, 0.2);
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.06) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(8, 145, 178, 0.06) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem 1rem 3rem 1rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Standard SVG Icon helper */
+    .icon {
+      width: 20px;
+      height: 20px;
+      stroke-width: 2;
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    /* Top Bar Header */
+    header {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.1rem 1.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      box-shadow: var(--shadow-card);
+      transition: box-shadow 0.2s ease;
+    }
+    header:hover {
+      box-shadow: var(--shadow-hover);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+    }
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, #4f46e5, #0891b2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    }
+    .brand-titles h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .brand-titles p {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+    .status-pill.live {
+      background: var(--safe-bg);
+      border-color: var(--safe-border);
+      color: var(--safe);
+    }
+    .status-pill.live .beacon {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--safe);
+      box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+      animation: pulseBeacon 1.8s infinite;
+    }
+    @keyframes pulseBeacon {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+      70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.48rem 0.95rem;
+      border-radius: var(--radius-md);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-main);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      text-decoration: none;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+      border-color: #cbd5e1;
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+    }
+    .btn-danger-outline {
+      color: var(--danger);
+      background: #ffffff;
+      border-color: #fecaca;
+    }
+    .btn-danger-outline:hover {
+      background: var(--danger-bg);
+      border-color: var(--danger);
+    }
+
+    /* Main Status Banner Card */
+    .hero-banner {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      box-shadow: var(--shadow-card);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    .hero-banner::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 6px;
+      background: var(--safe);
+      transition: background 0.3s ease;
+    }
+    .hero-banner.safe::before { background: var(--safe); }
+    .hero-banner.warning::before { background: var(--warn); }
+    .hero-banner.danger::before { 
+      background: var(--danger);
+      animation: alertPulse 0.8s infinite alternate;
+    }
+    @keyframes alertPulse {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; box-shadow: 0 0 16px var(--danger); }
+    }
+
+    .hero-banner-content {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    .hero-status-icon-wrap {
+      width: 52px;
+      height: 52px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      background: var(--safe-bg);
+      color: var(--safe);
+      border: 1px solid var(--safe-border);
+    }
+    .hero-banner.warning .hero-status-icon-wrap {
+      background: var(--warn-bg);
+      color: var(--warn);
+      border-color: var(--warn-border);
+    }
+    .hero-banner.danger .hero-status-icon-wrap {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border-color: var(--danger-border);
+      animation: iconVibrate 0.3s infinite;
+    }
+    @keyframes iconVibrate {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    .hero-banner-text h2 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.2rem;
+    }
+    .hero-banner-text p {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .hero-banner-timestamp {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem;
+      color: var(--text-light);
+      background: var(--bg-subtle);
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    /* KPI Summary Cards Grid */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1.25rem;
+    }
+    .kpi-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      box-shadow: var(--shadow-card);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      position: relative;
+    }
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-hover);
+    }
+    .kpi-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+    }
+    .kpi-title {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .kpi-icon-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+    }
+    .kpi-value {
+      font-size: 1.85rem;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+    }
+    .kpi-meter {
+      height: 6px;
+      background: var(--bg-subtle);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      margin-top: 0.2rem;
+    }
+    .kpi-meter-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--safe);
+      border-radius: var(--radius-full);
+      transition: width 0.4s ease, background 0.4s ease;
+    }
+
+    /* 2-Column Split: Sensor Gauges & Hardware Actuator Twin */
+    .grid-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 900px) {
+      .grid-split { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      box-shadow: var(--shadow-card);
+      transition: box-shadow 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+    .card:hover {
+      box-shadow: var(--shadow-hover);
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-head-left {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .card-head h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .card-head-badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      color: var(--text-muted);
+    }
+
+    /* SVG Radial Gauge */
+    .gauge-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 0;
+      position: relative;
+    }
+    .gauge-svg {
+      width: 220px;
+      height: 120px;
+    }
+    .gauge-bg {
+      fill: none;
+      stroke: #f1f5f9;
+      stroke-width: 14;
+      stroke-linecap: round;
+    }
+    .gauge-fill {
+      fill: none;
+      stroke: var(--safe);
+      stroke-width: 14;
+      stroke-linecap: round;
+      stroke-dasharray: 235.6;
+      stroke-dashoffset: 235.6;
+      transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease;
+    }
+    .gauge-center-text {
+      position: absolute;
+      bottom: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .gauge-number {
+      font-size: 2.1rem;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+    .gauge-sub {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 0.25rem;
+    }
+
+    /* Hardware Digital Twin Section (LEDs & Buzzer) */
+    .hardware-twin-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.9rem;
+    }
+    @media (max-width: 700px) {
+      .hardware-twin-grid { grid-template-columns: 1fr; }
+    }
+
+    .device-slot {
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.8rem;
+      text-align: center;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .device-slot:hover {
+      background: #ffffff;
+      border-color: #cbd5e1;
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .device-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+    .device-pin-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--text-light);
+      background: #f1f5f9;
+      padding: 0.15rem 0.45rem;
+      border-radius: var(--radius-sm);
+    }
+
+    /* REALISTIC HARDWARE 3D LEDS */
+    .led-socket {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      border: 2px solid #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12);
+      position: relative;
+    }
+    .led-dome {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .led-dome::after {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 7px;
+      width: 10px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.75);
+      transform: rotate(-30deg);
+    }
+
+    /* GREEN SAFE LED ANIMATION */
+    .led-green-off {
+      background: #14532d;
+      box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.6);
+      opacity: 0.45;
+    }
+    .led-green-on {
+      background: #10b981;
+      box-shadow: 
+        0 0 16px #10b981, 
+        0 0 32px rgba(16, 185, 129, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.8),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+      animation: greenBreathing 2.2s infinite ease-in-out;
+    }
+    @keyframes greenBreathing {
+      0%, 100% {
+        box-shadow: 0 0 14px #10b981, 0 0 24px rgba(16, 185, 129, 0.4);
+      }
+      50% {
+        box-shadow: 0 0 24px #10b981, 0 0 45px rgba(16, 185, 129, 0.7);
+      }
+    }
+
+    /* RED ALERT LED ANIMATION (STROBE) */
+    .led-red-off {
+      background: #7f1d1d;
+      box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.6);
+      opacity: 0.35;
+    }
+    .led-red-on {
+      background: #ef4444;
+      box-shadow: 
+        0 0 24px #ef4444, 
+        0 0 48px rgba(239, 68, 68, 0.8),
+        inset 0 2px 4px rgba(255, 255, 255, 0.9);
+      animation: redStrobeFlash 0.36s infinite;
+    }
+    @keyframes redStrobeFlash {
+      0%, 48% {
+        background: #ef4444;
+        box-shadow: 0 0 28px #ef4444, 0 0 54px rgba(239, 68, 68, 0.9);
+      }
+      50%, 100% {
+        background: #450a0a;
+        box-shadow: none;
+      }
+    }
+
+    /* BUZZER ANIMATION */
+    .buzzer-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+    .buzzer-active .buzzer-icon-wrap {
+      background: var(--danger-bg);
+      color: var(--danger);
+      animation: buzzerWobble 0.25s infinite;
+      box-shadow: 0 0 16px var(--danger-glow);
+    }
+    @keyframes buzzerWobble {
+      0%, 100% { transform: rotate(0deg) scale(1); }
+      25% { transform: rotate(-8deg) scale(1.1); }
+      75% { transform: rotate(8deg) scale(1.1); }
+    }
+
+    /* FAN ACTUATOR ANIMATION */
+    .fan-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+    .fan-spinning .fan-icon-wrap {
+      background: #ecfeff;
+      color: var(--cyan);
+      box-shadow: 0 0 16px rgba(8, 145, 178, 0.3);
+    }
+    .fan-spinning svg {
+      animation: spinFan 0.6s infinite linear;
+    }
+    @keyframes spinFan {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .device-status-text {
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    /* Real-Time Waveform Chart */
+    .chart-box {
+      width: 100%;
+      height: 180px;
+      position: relative;
+    }
+    canvas#trend-chart {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: var(--radius-md);
+    }
+
+    /* Controls Panel */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 1.25rem;
+      align-items: center;
+    }
+    @media (max-width: 800px) {
+      .controls-grid { grid-template-columns: 1fr; }
+    }
+
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .slider-val-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 7px;
+      border-radius: var(--radius-full);
+      background: #e2e8f0;
+      outline: none;
+      transition: background 0.2s;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.4);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 10px rgba(79, 70, 229, 0.5);
+    }
+
+    /* SQLite Live Records Table */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: #ffffff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      text-align: left;
+    }
+    thead {
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      padding: 0.75rem 1rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #f1f5f9;
+      color: var(--text-main);
+      white-space: nowrap;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tbody tr {
+      transition: background 0.15s ease;
+    }
+    tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: var(--radius-full);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .badge-safe {
+      background: var(--safe-bg);
+      color: var(--safe);
+      border: 1px solid var(--safe-border);
+    }
+    .badge-danger {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid var(--danger-border);
+    }
+    .badge-warn {
+      background: var(--warn-bg);
+      color: var(--warn);
+      border: 1px solid var(--warn-border);
+    }
+
+    /* Events Audit Feed */
+    .events-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 180px;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+    }
+    .event-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0.85rem;
+      border-radius: var(--radius-sm);
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      font-size: 0.78rem;
+      transition: background 0.2s ease;
+    }
+    .event-item:hover {
+      background: #f1f5f9;
+    }
+    .event-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-light);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Top Navigation Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-mark">
+          <svg class="icon" viewBox="0 0 24 24">
+            <path d="M12 2c0 4.5-4 7-4 10a4 4 0 0 0 8 0c0-3-4-5.5-4-10z"></path>
+          </svg>
+        </div>
+        <div class="brand-titles">
+          <h1>Aura GasGuard™</h1>
+          <p>ESP32 IoT Gas Leakage Safety Sentinel</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="status-pill live" id="stream-pill">
+          <span class="beacon"></span>
+          <span id="stream-label">LIVE HARDWARE (COM5)</span>
+        </div>
+
+        <div class="status-pill">
+          <svg class="icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;">
+            <path d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+          <span id="db-counter-badge">SQLite Storage</span>
+        </div>
+
+        <a href="/api/export/csv" class="btn" title="Download SQLite database as CSV spreadsheet">
+          <svg class="icon" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Export CSV</span>
+        </a>
+
+        <button onclick="purgeDatabase()" class="btn btn-danger-outline" title="Clear all stored readings and reset table">
+          <svg class="icon" viewBox="0 0 24 24">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span>Reset DB</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Dynamic Hero Status Banner -->
+    <div class="hero-banner" id="hero-banner">
+      <div class="hero-banner-content">
+        <div class="hero-status-icon-wrap" id="hero-icon-wrap">
+          <svg class="icon" id="hero-icon" style="width: 28px; height: 28px;" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <path d="m9 12 2 2 4-4"></path>
+          </svg>
+        </div>
+        <div class="hero-banner-text">
+          <h2 id="hero-title">CONNECTING TO SENSOR...</h2>
+          <p id="hero-desc">Listening on COM5 serial bus and HTTP API for live telemetry packets.</p>
+        </div>
+      </div>
+      <div class="hero-banner-timestamp" id="hero-time">Syncing...</div>
+    </div>
+
+    <!-- Visual KPI Metrics Grid -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Gas Level</span>
+          <div class="kpi-icon-badge">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path d="M12 2c0 4.5-4 7-4 10a4 4 0 0 0 8 0c0-3-4-5.5-4-10z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-gas-pct">--</div>
+        <div class="kpi-meter">
+          <div class="kpi-meter-bar" id="kpi-gas-bar"></div>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Raw ADC Signal</span>
+          <div class="kpi-icon-badge">
+            <svg class="icon" viewBox="0 0 24 24">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-raw-adc">--</div>
+        <div style="font-size: 0.72rem; color: var(--text-light); font-weight: 600;">12-Bit Scale (0 - 4095)</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Est. Concentration</span>
+          <div class="kpi-icon-badge">
+            <svg class="icon" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-ppm">--</div>
+        <div style="font-size: 0.72rem; color: var(--text-light); font-weight: 600;">LPG / Butane / Smoke</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Total Logged</span>
+          <div class="kpi-icon-badge">
+            <svg class="icon" viewBox="0 0 24 24">
+              <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="kpi-value" id="kpi-total-readings">0</div>
+        <div style="font-size: 0.72rem; color: var(--text-light); font-weight: 600;">SQLite Relational Engine</div>
+      </div>
+    </div>
+
+    <!-- 2-Column Core Section: Radial Dial Gauge + Hardware Digital Twin -->
+    <div class="grid-split">
+      
+      <!-- Card A: Semi-Circular Radial Dial Gauge -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-left">
+            <svg class="icon" style="color: var(--primary);" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <h3>Concentration Gauge</h3>
+          </div>
+          <span class="card-head-badge" id="gauge-limit-badge">Limit: --</span>
+        </div>
+
+        <div class="gauge-wrapper">
+          <svg class="gauge-svg" viewBox="0 0 100 55">
+            <path class="gauge-bg" d="M 12 50 A 38 38 0 0 1 88 50"></path>
+            <path class="gauge-fill" id="gauge-fill-arc" d="M 12 50 A 38 38 0 0 1 88 50"></path>
+          </svg>
+          <div class="gauge-center-text">
+            <span class="gauge-number" id="dial-number">--</span>
+            <span class="gauge-sub" id="dial-status-sub">AWAITING SENSOR</span>
+          </div>
+        </div>
+
+        <!-- Real-Time Waveform Sparkline -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+          <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Real-Time Trend Wave</span>
+          <span style="font-size: 0.7rem; font-family: 'JetBrains Mono', monospace; color: var(--text-light);">Continuous Stream</span>
+        </div>
+        <div class="chart-box">
+          <canvas id="trend-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Card B: Hardware Twin / Real-Time Physical Actuators -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-left">
+            <svg class="icon" style="color: var(--cyan);" viewBox="0 0 24 24">
+              <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+              <rect x="9" y="9" width="6" height="6"></rect>
+              <line x1="9" y1="1" x2="9" y2="4"></line>
+              <line x1="15" y1="1" x2="15" y2="4"></line>
+              <line x1="9" y1="20" x2="9" y2="23"></line>
+              <line x1="15" y1="20" x2="15" y2="23"></line>
+              <line x1="20" y1="9" x2="23" y2="9"></line>
+              <line x1="20" y1="14" x2="23" y2="14"></line>
+              <line x1="1" y1="9" x2="4" y2="9"></line>
+              <line x1="1" y1="14" x2="4" y2="14"></line>
+            </svg>
+            <h3>Hardware Digital Twin</h3>
+          </div>
+          <span class="card-head-badge">ESP32 30-Pin Mirror</span>
+        </div>
+
+        <div class="hardware-twin-grid">
+          
+          <!-- 1. Green Safe LED (GPIO 27) -->
+          <div class="device-slot">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+              <span class="device-label">Safe LED</span>
+              <span class="device-pin-tag">GPIO 27</span>
+            </div>
+            <div class="led-socket">
+              <div class="led-dome led-green-off" id="twin-led-green"></div>
+            </div>
+            <span class="device-status-text" id="twin-green-label" style="color: var(--text-light);">STANDBY</span>
+          </div>
+
+          <!-- 2. Red Alert LED (GPIO 26) -->
+          <div class="device-slot">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+              <span class="device-label">Alert LED</span>
+              <span class="device-pin-tag">GPIO 26</span>
+            </div>
+            <div class="led-socket">
+              <div class="led-dome led-red-off" id="twin-led-red"></div>
+            </div>
+            <span class="device-status-text" id="twin-red-label" style="color: var(--text-light);">STANDBY</span>
+          </div>
+
+          <!-- 3. Acoustic Siren Buzzer (GPIO 25) -->
+          <div class="device-slot" id="twin-buzzer-slot">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+              <span class="device-label">Siren Buzzer</span>
+              <span class="device-pin-tag">GPIO 25</span>
+            </div>
+            <div class="buzzer-icon-wrap" id="twin-buzzer-icon">
+              <svg class="icon" viewBox="0 0 24 24" style="width: 24px; height: 24px;">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+            </div>
+            <span class="device-status-text" id="twin-buzzer-label">STANDBY</span>
+          </div>
+
+        </div>
+
+        <!-- Controls: System Drill Button -->
+        <div style="display: flex; gap: 0.75rem; margin-top: auto;">
+          <button onclick="triggerDrill()" class="btn btn-primary" style="flex: 1; justify-content: center;" id="btn-drill">
+            <svg class="icon" viewBox="0 0 24 24">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            <span>Trigger Emergency Alarm Drill (4s)</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Threshold Control Card -->
+    <div class="card">
+      <div class="controls-grid">
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>Safety Alarm Threshold Setpoint</span>
+            <span class="slider-val-tag" id="slider-val-display">40%</span>
+          </div>
+          <input type="range" id="threshold-slider" min="10" max="90" value="40" oninput="onThresholdChange(this.value)">
+        </div>
+
+        <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4;">
+          Adjusts the trigger limit. Gas levels exceeding this setpoint sound the buzzer and energize the ventilation relay.
+        </div>
+
+        <div style="text-align: right;">
+          <span class="status-pill" id="sync-rate-badge">Sync: 1.5s Polling</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SQLite Live Data Table -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-left">
+          <svg class="icon" style="color: var(--primary);" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <h3>SQLite Live Sensor Log</h3>
+        </div>
+        <span class="card-head-badge">Real-Time Ingestion</span>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Timestamp</th>
+              <th>Device</th>
+              <th>Raw ADC</th>
+              <th>Gas Level</th>
+              <th>PPM Estimate</th>
+              <th>Status</th>
+              <th>Siren Buzzer</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">Connecting to live stream...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- System Event Audit Feed -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-left">
+          <svg class="icon" style="color: var(--cyan);" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg>
+          <h3>System Audit Log</h3>
+        </div>
+        <span class="card-head-badge">Audit Trail</span>
+      </div>
+
+      <div class="events-feed" id="events-container">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentThreshold = 40;
+    let historyPoints = [];
+
+    // Canvas Sparkline
+    const canvas = document.getElementById('trend-chart');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = canvas.parentElement.clientWidth * dpr;
+      canvas.height = canvas.parentElement.clientHeight * dpr;
+      ctx.scale(dpr, dpr);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function renderTrendChart() {
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      ctx.clearRect(0, 0, w, h);
+
+      // Light-mode grid lines
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = 1;
+      for (let y = h / 4; y < h; y += h / 4) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Threshold limit line
+      const threshY = Math.max(8, Math.min(h - 4, h - (currentThreshold / 100 * h)));
+      ctx.strokeStyle = 'rgba(220, 38, 38, 0.45)';
+      ctx.setLineDash([5, 5]);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, threshY);
+      ctx.lineTo(w, threshY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#dc2626';
+      ctx.font = '600 10px JetBrains Mono';
+      ctx.fillText('THRESHOLD ' + currentThreshold + '%', 8, Math.max(12, threshY - 4));
+
+      if (historyPoints.length < 2) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '600 11px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText('AWAITING LIVE SENSOR STREAM...', w / 2, h / 2);
+        ctx.textAlign = 'start';
+        return;
+      }
+      const step = w / (historyPoints.length - 1);
+      ctx.beginPath();
+      ctx.moveTo(0, h - (historyPoints[0] / 100 * h));
+
+      for (let i = 1; i < historyPoints.length; i++) {
+        const x = i * step;
+        const y = h - (historyPoints[i] / 100 * h);
+        ctx.lineTo(x, y);
+      }
+
+      const latestVal = historyPoints[historyPoints.length - 1];
+      const isDanger = latestVal >= currentThreshold;
+      const isWarn = latestVal >= currentThreshold * 0.75;
+      const strokeColor = isDanger ? '#dc2626' : (isWarn ? '#d97706' : '#059669');
+
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = strokeColor;
+      ctx.stroke();
+
+      // Translucent area fill
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, isDanger ? 'rgba(220, 38, 38, 0.22)' : 'rgba(5, 150, 105, 0.18)');
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // Dial Gauge Arc
+    function updateGauge(pct) {
+      const totalArc = 235.6; // perimeter of semicircle
+      const clamped = Math.max(0, Math.min(100, pct));
+      const offset = totalArc - (clamped / 100 * totalArc);
+      const arc = document.getElementById('gauge-fill-arc');
+      arc.style.strokeDashoffset = offset;
+
+      let color = 'var(--safe)';
+      if (clamped >= currentThreshold) color = 'var(--danger)';
+      else if (clamped >= currentThreshold * 0.75) color = 'var(--warn)';
+      arc.style.stroke = color;
+
+      document.getElementById('dial-number').innerText = clamped.toFixed(1) + '%';
+      const sub = document.getElementById('dial-status-sub');
+      if (clamped >= currentThreshold) {
+        sub.innerText = 'DANGER LEVEL';
+        sub.style.color = 'var(--danger)';
+      } else if (clamped >= currentThreshold * 0.75) {
+        sub.innerText = 'ELEVATED LEVEL';
+        sub.style.color = 'var(--warn)';
+      } else {
+        sub.innerText = 'SAFE BASELINE';
+        sub.style.color = 'var(--text-muted)';
+      }
+    }
+
+    // Polling Backend API
+    async function syncBackend() {
+      try {
+        // 1. Fetch Latest Telemetry
+        const resLatest = await fetch('/api/sensor-data/latest');
+        if (resLatest.ok) {
+          const data = await resLatest.json();
+          currentThreshold = data.threshold || 40;
+          document.getElementById('gauge-limit-badge').innerText = 'Limit: ' + currentThreshold + '%';
+          document.getElementById('slider-val-display').innerText = currentThreshold + '%';
+          document.getElementById('threshold-slider').value = currentThreshold;
+
+          const gasVal = data.gas_percent || 0;
+          document.getElementById('kpi-gas-pct').innerText = gasVal.toFixed(1) + '%';
+          document.getElementById('kpi-raw-adc').innerText = data.raw_value || 0;
+          document.getElementById('kpi-ppm').innerText = '~' + (data.ppm_estimated || 0) + ' ppm';
+
+          const gasBar = document.getElementById('kpi-gas-bar');
+          gasBar.style.width = Math.min(100, gasVal) + '%';
+          gasBar.style.background = gasVal >= currentThreshold ? 'var(--danger)' : (gasVal >= currentThreshold * 0.75 ? 'var(--warn)' : 'var(--safe)');
+
+          updateGauge(gasVal);
+
+          // Hero Banner Updates
+          const banner = document.getElementById('hero-banner');
+          const title = document.getElementById('hero-title');
+          const desc = document.getElementById('hero-desc');
+          const heroIcon = document.getElementById('hero-icon');
+
+          const status = (data.status || 'SAFE').toUpperCase();
+          if (status === 'DANGER') {
+            banner.className = 'hero-banner danger';
+            title.innerText = 'CRITICAL: GAS LEAK DETECTED';
+            desc.innerText = 'High concentration of flammable gas detected! Exhaust ventilation triggered and alarm buzzer pulsing.';
+            heroIcon.innerHTML = '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>';
+          } else if (status === 'WARNING') {
+            banner.className = 'hero-banner warning';
+            title.innerText = 'ELEVATED GAS CONCENTRATION';
+            desc.innerText = 'Sensor reading is approaching the setpoint threshold. Monitoring database records closely.';
+            heroIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
+          } else if (status === 'WAITING_DATA') {
+            banner.className = 'hero-banner warning';
+            title.innerText = 'SYSTEM ARMED • WAITING FOR TELEMETRY';
+            desc.innerText = 'Backend container online. Connect ESP32 via USB Serial or Wi-Fi to stream live data.';
+            heroIcon.innerHTML = '<path d="M12 2v20M2 12h20"></path>';
+          } else {
+            banner.className = 'hero-banner safe';
+            title.innerText = 'ATMOSPHERE NOMINAL • SAFE';
+            desc.innerText = 'Atmospheric gas concentration is within normal baseline. All physical sensors monitored continuously.';
+            heroIcon.innerHTML = '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path>';
+          }
+
+          document.getElementById('hero-time').innerText = 'Synced: ' + (data.timestamp || 'Live');
+
+          // HARDWARE TWIN ACTUATOR UPDATES
+          const isDanger = (status === 'DANGER');
+
+          // Green LED: Solid when SAFE, OFF when DANGER
+          const twinGreen = document.getElementById('twin-led-green');
+          const twinGreenLbl = document.getElementById('twin-green-label');
+          if (isDanger) {
+            twinGreen.className = 'led-dome led-green-off';
+            twinGreenLbl.innerText = 'OFF';
+            twinGreenLbl.style.color = 'var(--text-light)';
+          } else {
+            twinGreen.className = 'led-dome led-green-on';
+            twinGreenLbl.innerText = 'GLOWING SOLID';
+            twinGreenLbl.style.color = 'var(--safe)';
+          }
+
+          // Red LED: Strobe Flash when DANGER, OFF when SAFE
+          const twinRed = document.getElementById('twin-led-red');
+          const twinRedLbl = document.getElementById('twin-red-label');
+          if (isDanger) {
+            twinRed.className = 'led-dome led-red-on';
+            twinRedLbl.innerText = 'FLASHING ALARM';
+            twinRedLbl.style.color = 'var(--danger)';
+          } else {
+            twinRed.className = 'led-dome led-red-off';
+            twinRedLbl.innerText = 'STANDBY (OFF)';
+            twinRedLbl.style.color = 'var(--text-light)';
+          }
+
+          // Buzzer: Active or Silent
+          const buzzerSlot = document.getElementById('twin-buzzer-slot');
+          const buzzerLbl = document.getElementById('twin-buzzer-label');
+          if (data.buzzer_state || isDanger) {
+            buzzerSlot.className = 'device-slot buzzer-active';
+            buzzerLbl.innerText = 'PULSING SIREN';
+            buzzerLbl.style.color = 'var(--danger)';
+          } else {
+            buzzerSlot.className = 'device-slot';
+            buzzerLbl.innerText = 'SILENT';
+            buzzerLbl.style.color = 'var(--text-light)';
+          }
+        }
+
+        // Periodic secondary sync (every 1s for history, stats, table)
+        const now = Date.now();
+        if (now - lastSecondarySync >= 1000) {
+          lastSecondarySync = now;
+
+          // 2. Fetch Chart History
+          const resHist = await fetch('/api/sensor-data/history?limit=60');
+          if (resHist.ok) {
+            const hist = await resHist.json();
+            if (hist.readings && hist.readings.length > 0) {
+              historyPoints = hist.readings.map(r => r.gas_percent);
+            } else {
+              historyPoints = [];
+            }
+            renderTrendChart();
+          }
+
+          // 3. Fetch KPI Summary Stats
+          const resStats = await fetch('/api/statistics');
+          if (resStats.ok) {
+            const s = await resStats.json();
+            document.getElementById('kpi-total-readings').innerText = (s.total_readings || 0).toLocaleString();
+            document.getElementById('db-counter-badge').innerText = (s.total_readings || 0) + ' Records';
+          }
+
+          // 4. Fetch Table Records
+          const resRecent = await fetch('/api/sensor-data/history?limit=12');
+          if (resRecent.ok) {
+            const d = await resRecent.json();
+            const tbody = document.getElementById('table-body');
+            if (d.readings && d.readings.length > 0) {
+              const reversed = [...d.readings].reverse();
+              tbody.innerHTML = reversed.map(r => `
+                <tr>
+                  <td>#${r.id}</td>
+                  <td>${r.timestamp}</td>
+                  <td>${r.device_id}</td>
+                  <td>${r.raw_value}</td>
+                  <td style="font-weight:700; color: ${r.gas_percent >= currentThreshold ? 'var(--danger)' : 'var(--safe)'};">${r.gas_percent.toFixed(1)}%</td>
+                  <td>~${r.ppm_estimated} ppm</td>
+                  <td><span class="badge ${r.status === 'DANGER' ? 'badge-danger' : (r.status === 'WARNING' ? 'badge-warn' : 'badge-safe')}">${r.status}</span></td>
+                  <td>${r.buzzer_state ? '<span style="color:var(--danger); font-weight:700;">ACTIVE</span>' : '<span style="color:var(--text-light);">OFF</span>'}</td>
+                </tr>
+              `).join('');
+            } else {
+              tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No telemetry recorded yet. Real-time readings stream automatically.</td></tr>';
+            }
+          }
+
+          // 5. Fetch Events Audit Feed
+          const resEvents = await fetch('/api/events');
+          if (resEvents.ok) {
+            const evs = await resEvents.json();
+            const container = document.getElementById('events-container');
+            if (evs && evs.length > 0) {
+              container.innerHTML = evs.slice(0, 8).map(e => `
+                <div class="event-item">
+                  <span style="font-weight: 600; color: ${e.severity === 'CRITICAL' ? 'var(--danger)' : (e.severity === 'WARNING' ? 'var(--warn)' : 'var(--text-main)')};">${e.message}</span>
+                  <span class="event-time">${e.timestamp.split(' ')[1] || e.timestamp}</span>
+                </div>
+              `).join('');
+            } else {
+              container.innerHTML = '<div style="color: var(--text-light); font-size: 0.78rem; text-align: center; padding: 1rem;">No events logged.</div>';
+            }
+          }
+        }
+
+        document.getElementById('stream-pill').className = 'status-pill live';
+        document.getElementById('stream-label').innerText = 'LIVE HARDWARE (COM5)';
+
+      } catch (err) {
+        document.getElementById('stream-pill').className = 'status-pill';
+        document.getElementById('stream-label').innerText = 'RECONNECTING...';
+      }
+    }
+
+    // Actuator Controls
+    async function triggerDrill() {
+      await fetch('/api/test-alarm', { method: 'POST' });
+      syncBackend();
+    }
+
+    async function onThresholdChange(val) {
+      document.getElementById('slider-val-display').innerText = val + '%';
+      await fetch('/api/config/threshold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threshold: parseInt(val) })
+      });
+      syncBackend();
+    }
+
+    async function purgeDatabase() {
+      if (confirm("Reset the SQLite database and purge stored records?")) {
+        const res = await fetch('/api/database/clear', { method: 'POST' });
+        if (res.ok) {
+          historyPoints = new Array(60).fill(0);
+          syncBackend();
+        }
+      }
+    }
+
+    let lastSecondarySync = 0;
+    setInterval(syncBackend, 250);
+    syncBackend();
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  gasguard-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gasguard-iot-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - PYTHONUNBUFFERED=1
+      - DATABASE_PATH=/app/data/sensor_database.db
+    volumes:
+      # Persistent host mount for SQLite database storage and static dashboard
+      - ./backend/data:/app/data
+      - ./backend/static:/app/static
+      - ./backend/app.py:/app/app.py
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+

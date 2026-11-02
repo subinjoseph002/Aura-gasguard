@@ -1,0 +1,33 @@
+# =====================================================================================
+# Aura GasGuard™ — Render Blueprint Specification (Infrastructure-as-Code)
+# =====================================================================================
+# This file allows one-click deployment on Render as a Docker Web Service.
+#
+# IMPORTANT STORAGE NOTICE:
+# - Paid Starter Plan ($7/mo): Supports Persistent Disks (`disk:` block enabled).
+#   Your SQLite database is preserved permanently across redeploys at `/var/data`.
+# - Free Tier Plan: Persistent disks are not available on the free tier.
+#   Comment out the `disk:` block and set DATABASE_PATH to `/app/data/sensor_database.db`.
+# =====================================================================================
+
+services:
+  - type: web
+    name: aura-gasguard
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: starter
+    region: oregon
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: DATABASE_PATH
+        value: /var/data/sensor_database.db
+      - key: PYTHONUNBUFFERED
+        value: 1
+    disk:
+      name: gasguard-data
+      mountPath: /var/data
+      sizeGB: 1

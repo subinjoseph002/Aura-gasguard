@@ -1,0 +1,6 @@
+# Aura GasGuard Backend Dependencies
+# Built using Python Standard Library (http.server, sqlite3, json)
+# Optional enhancements:
+requests>=2.31.0
+python-dotenv>=1.0.0
+
