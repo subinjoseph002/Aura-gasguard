@@ -109,12 +109,15 @@ COMMON GND ─────►  GND ─┤ 14                   17 ├─ GND
 | :--- | :--- | :--- | :--- |
 | **solid** | off | silent | Idle / normal (also during the 20 s warm-up, when the alarm is disabled) |
 | off | **flashing** | **beeping** | **GAS ALARM** - starts within ~100 ms of the reading passing the limit (fan relay ON) |
-| off | one brief blip every 2 s | silent | Sensor signal missing for more than 5 s (check `A0`, `VCC`, `GND`) |
+| off | one brief blip every 2 s | silent | *(only if `SENSOR_FAULT_DETECT 1`)* sensor signal missing for more than 5 s |
 
-A signal dip shorter than 5 s (loose jumper wobble, power dip) is ignored and never changes the LEDs.
+**ADC reading 0 in clean air is normal** for many MQ modules (e.g. MQ-9): their idle output is below the
+ESP32 ADC's ~0.1 V dead zone. It is shown as idle (green steady, no buzzer, no red). Fault reporting is therefore
+**off by default**; set `SENSOR_FAULT_DETECT 1` in `include/config.h` only if your sensor idles well above 0 and you
+want a loose-wire warning. A reading that falls back to 0 always clears an active gas alarm.
 
 ### 5. "Sensor signal lost" / MQ-9 notes
-- The dashboard event *"signal lost for 5 s"* means the analog reading stayed near 0 for 5 s. Causes, most likely first:
+- With `SENSOR_FAULT_DETECT 1`, the dashboard event *"signal lost for 5 s"* means the analog reading stayed near 0 for 5 s. Causes, most likely first:
   1. Loose jumper on the sensor's `VCC`, `GND` or `A0` (breadboards are notorious - push the wires in firmly or solder).
   2. Sensor powered from `3V3` instead of `VIN` (5 V). The heater needs 5 V.
   3. `A0` wired to the wrong pin (use D34, or D32 - both are auto-detected).

@@ -43,10 +43,16 @@
 #define SAMPLE_INTERVAL_MS      50      // sensor sampled 20x per second
 #define TRIGGER_SAMPLES         2       // consecutive samples over limit before alarming (~100 ms)
                                         // (a reading >= 2x the limit alarms on the very first sample)
-#define SENSOR_MIN_VALID_RAW    20      // below this the AO signal is considered missing
-#define FAULT_HOLD_MS           5000UL  // ...and only after it stays missing this long, so a brief
-                                        // wire wobble / power dip never changes the LEDs
-                                        // (a saturated 4095 is NOT a fault: it means a lot of gas)
+#define SENSOR_MIN_VALID_RAW    20      // readings below this are "dead zone / no signal": never learned
+                                        // as clean air and never alarm. Many MQ modules (e.g. MQ-9) sit
+                                        // BELOW the ESP32 ADC dead zone (~0.1 V) in clean air and read
+                                        // exactly 0 - that is NORMAL and shown as idle (green steady).
+#ifndef SENSOR_FAULT_DETECT
+#define SENSOR_FAULT_DETECT     0       // 1 = report FAULT (green off, red blip, dashboard banner) when the
+                                        // signal stays below the minimum for FAULT_HOLD_MS. Leave 0 if your
+                                        // sensor reads 0 in clean air, otherwise idle would look like a fault.
+#endif
+#define FAULT_HOLD_MS           5000UL
 #define SENSOR_NAME             "MQ-9"  // label sent to the dashboard (MQ-2, MQ-9, ...)
 
 // ---- Exhaust fan relay (optional, see CIRCUIT_DIAGRAM.md) ------------------------------

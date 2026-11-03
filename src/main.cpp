@@ -295,9 +295,10 @@ void sampleSensor(unsigned long now) {
 
   int raw = readAdc(sensorPin, 16);
   gasRawValue = raw;
-  faultCount = (raw < SENSOR_MIN_VALID_RAW) ? faultCount + 1 : 0;
-  sensorFault = faultCount >= (int)(FAULT_HOLD_MS / SAMPLE_INTERVAL_MS);
-  if (sensorFault && now - lastRedetect >= 5000) {   // wiring may have changed: look at both pins again
+  faultCount = (raw < SENSOR_MIN_VALID_RAW) ? min(faultCount + 1, 100000) : 0;
+  bool signalMissing = faultCount >= (int)(FAULT_HOLD_MS / SAMPLE_INTERVAL_MS);
+  sensorFault = SENSOR_FAULT_DETECT && signalMissing;
+  if (signalMissing && now - lastRedetect >= 5000) {  // maybe the AO is on the other pin: look again
     lastRedetect = now;
     detectSensor();
   }
@@ -325,9 +326,15 @@ void sampleSensor(unsigned long now) {
     return;
   }
 
-  if (raw < SENSOR_MIN_VALID_RAW) {         // signal momentarily missing: never learn it, never alarm on it
-    gasPercent = 0.0f;
+  if (raw < SENSOR_MIN_VALID_RAW) {         // dead zone / no signal: never learn it, never raise an alarm
+    gasPercent = 0.0f;                      // on it, and a reading back at 0 means the gas is gone
     overCount = 0;
+    if (isGasDanger) {
+      isGasDanger = false;
+      isBuzzerMuted = false;
+      telemetryNow = true;
+      Serial.println("\n[ALARM CLEARED] signal back to 0\n");
+    }
     return;
   }
 
