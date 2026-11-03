@@ -14,6 +14,7 @@ import time
 import re
 import os
 import json
+import threading
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -83,6 +84,41 @@ def post_to_backend(payload):
             LAST_ERROR = type(e).__name__
             return False, None
 
+def sender_loop(state):
+    """Uploads readings on its own thread so a slow network never stalls the serial reader.
+    Only the NEWEST reading is kept; stale ones are dropped (status changes are never dropped)."""
+    count = 0
+    last_pushed_threshold = None
+    while not state["stop"]:
+        with state["cond"]:
+            while not state["pending"] and not state["stop"]:
+                state["cond"].wait(0.5)
+            batch, state["pending"] = state["pending"], []
+            dropped, state["dropped"] = state["dropped"], 0
+        for payload in batch:
+            started = time.time()
+            ok, backend_threshold = post_to_backend({k: v for k, v in payload.items() if not k.startswith("_")})
+            count += 1
+            device_threshold = payload["threshold"]
+            ser = state["ser"]
+            # Cloud dashboard owns the alarm setpoint: push changes down to the ESP32 over USB.
+            if (isinstance(backend_threshold, int) and backend_threshold != device_threshold
+                    and backend_threshold != last_pushed_threshold and ser is not None):
+                last_pushed_threshold = backend_threshold
+                try:
+                    ser.write(f"T{backend_threshold}\n".encode())
+                    print(f"[CONFIG] Pushed threshold {backend_threshold}% to ESP32", flush=True)
+                except Exception:
+                    pass
+            status = payload["status"]
+            icon = {"DANGER": "🔴", "WARNING": "🟡", "FAULT": "⚪"}.get(status, "🟢")
+            sync = "OK" if ok else "RETRY (" + LAST_ERROR + ")"
+            skipped = f" | skipped {dropped} stale" if dropped else ""
+            print(f"[{count:04d}] {icon} Gas: {payload['gas_percent']:5.1f}% | ADC: {payload['raw_value']:4d} | "
+                  f"Status: {status:7s} | Cloud Sync: {sync} ({(time.time() - started) * 1000:.0f} ms){skipped}", flush=True)
+            dropped = 0
+
+
 def main():
     port = find_esp32_port()
     print("=" * 70, flush=True)
@@ -93,10 +129,12 @@ def main():
     print("  [>] Press Ctrl+C to stop streaming.", flush=True)
     print("=" * 70, flush=True)
 
+    state = {"cond": threading.Condition(), "pending": [], "dropped": 0, "stop": False, "ser": None}
+    threading.Thread(target=sender_loop, args=(state,), daemon=True).start()
+
     ser = None
-    count = 0
     warn_printed = False
-    last_pushed_threshold = None
+    last_status = None
 
     while True:
         try:
@@ -104,6 +142,8 @@ def main():
                 try:
                     port = find_esp32_port()
                     ser = serial.Serial(port, DEFAULT_BAUD, timeout=0.3)
+                    ser.reset_input_buffer()          # never replay readings buffered while we were away
+                    state["ser"] = ser
                     print(f"\n[CONNECTED] Successfully opened {port} @ {DEFAULT_BAUD} baud.", flush=True)
                     print(f"[STREAMING] Relaying hardware telemetry directly to cloud...\n", flush=True)
                     warn_printed = False
@@ -122,32 +162,25 @@ def main():
             match = TELEMETRY_PATTERN.search(line)
             if match:
                 gas_pct = float(match.group(1))
-                raw_adc = int(match.group(2))
-                threshold = int(match.group(3))
                 status = match.group(4).upper()
-                ppm = int((gas_pct / 100.0) * 1200 + 15)
-
                 payload = {
                     "device_id": "ESP32-GAS-01",
                     "sensor_type": "MQ-2",
-                    "raw_value": raw_adc,
+                    "raw_value": int(match.group(2)),
                     "gas_percent": gas_pct,
-                    "ppm_estimated": ppm,
+                    "ppm_estimated": int((gas_pct / 100.0) * 1200 + 15),
                     "status": status,
                     "buzzer_state": status == "DANGER",
-                    "threshold": threshold
+                    "threshold": int(match.group(3))
                 }
-
-                ok, backend_threshold = post_to_backend(payload)
-                count += 1
-                # Cloud dashboard owns the alarm setpoint: push changes down to the ESP32 over USB.
-                if (isinstance(backend_threshold, int) and backend_threshold != threshold
-                        and backend_threshold != last_pushed_threshold):
-                    last_pushed_threshold = backend_threshold
-                    ser.write(f"T{backend_threshold}\n".encode())
-                    print(f"[CONFIG] Pushed threshold {backend_threshold}% to ESP32", flush=True)
-                status_icon = {"DANGER": "🔴", "WARNING": "🟡", "FAULT": "⚪"}.get(status, "🟢")
-                print(f"[{count:04d}] {status_icon} Gas: {gas_pct:5.1f}% | ADC: {raw_adc:4d} | Status: {status:7s} | Cloud Sync: {'OK' if ok else 'RETRY (' + LAST_ERROR + ')'}", flush=True)
+                with state["cond"]:
+                    # Keep status transitions (alarm on/off) and only the newest ordinary reading.
+                    kept = [p for p in state["pending"] if p.get("_keep")]
+                    state["dropped"] += len(state["pending"]) - len(kept)
+                    payload["_keep"] = status != last_status
+                    state["pending"] = kept + [payload]
+                    state["cond"].notify()
+                last_status = status
 
             elif "[WARMUP]" in line:
                 print(f"  {line}", flush=True)
@@ -163,8 +196,10 @@ def main():
                 except Exception:
                     pass
                 ser = None
+                state["ser"] = None
             time.sleep(1.0)
 
+    state["stop"] = True
     if ser and ser.is_open:
         ser.close()
 

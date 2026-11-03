@@ -20,7 +20,7 @@ DB_PATH = os.environ.get("DATABASE_PATH", DEFAULT_DB_PATH)
 
 DEFAULT_THRESHOLD = 10        # % gas concentration that triggers the alarm (matches firmware)
 THRESHOLD_MIN, THRESHOLD_MAX = 5, 95
-RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", 14))   # readings older than this are pruned
+RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", 3))   # readings older than this are pruned
 
 def get_connection():
     db_dir = os.path.dirname(os.path.abspath(DB_PATH))
@@ -31,6 +31,7 @@ def get_connection():
         conn.row_factory = sqlite3.Row
         # Enable WAL mode for efficient concurrent read/writes
         conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")   # safe in WAL mode, far fewer fsyncs per reading
         return conn
     except sqlite3.Error as e:
         print(f"[ERROR] Database connection failed for path '{DB_PATH}': {e}")

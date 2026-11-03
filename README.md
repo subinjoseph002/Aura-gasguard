@@ -79,7 +79,7 @@ The backend dynamically configures itself via environment variables:
 | :--- | :--- | :--- |
 | `PORT` | `5000` | Port for the HTTP REST server (auto-configured by Render). |
 | `DATABASE_PATH` | `/app/data/sensor_database.db` | Absolute path to SQLite file. For Render Disks, set to `/var/data/sensor_database.db`. |
-| `RETENTION_DAYS` | `14` | Readings older than this are pruned automatically. |
+| `RETENTION_DAYS` | `3` | Readings older than this are pruned automatically. |
 | `PYTHONUNBUFFERED`| `1` | Forces real-time stdout/stderr flushing for live logs. |
 | `PYTHONDONTWRITEBYTECODE` | `1` | Prevents `.pyc` clutter inside containers. |
 
@@ -149,6 +149,9 @@ docker compose logs -f
     "timestamp": "2026-11-02 15:00:00"
   }
   ```
+
+### 2b. Live Push Stream (Server-Sent Events)
+* **Method & Path:** `GET /api/stream` - emits a `reading` event (same JSON as `/api/sensor-data/latest`) the instant a reading is ingested, plus a refresh every 5 s so `offline` detection stays accurate. The dashboard uses this for ~20 ms end-to-end display latency and falls back to polling automatically.
 
 ### 3. Fetch Latest Sensor Reading
 * **Method & Path:** `GET /api/sensor-data/latest`

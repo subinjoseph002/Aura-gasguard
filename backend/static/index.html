@@ -381,7 +381,7 @@
       width: 0%;
       background: var(--safe);
       border-radius: var(--radius-full);
-      transition: width 0.4s ease, background 0.4s ease;
+      transition: width 0.15s linear, background 0.15s ease;
     }
 
     /* 2-Column Split: Sensor Gauges & Hardware Actuator Twin */
@@ -460,7 +460,7 @@
       stroke-linecap: round;
       stroke-dasharray: 235.6;
       stroke-dashoffset: 235.6;
-      transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease;
+      transition: stroke-dashoffset 0.15s linear, stroke 0.15s ease;
     }
     .gauge-center-text {
       position: absolute;
@@ -1160,7 +1160,7 @@
   </div>
 
   <script>
-    let currentThreshold = 40;
+    let currentThreshold = 10;
     let historyPoints = [];
 
     // Canvas Sparkline
@@ -1272,197 +1272,215 @@
       }
     }
 
-    // Polling Backend API
-    async function syncBackend() {
+    // ---- Live data path ---------------------------------------------------------------
+    // 1) Server-Sent Events push every reading the moment the backend ingests it.
+    // 2) If the stream is silent/blocked, a non-overlapping poll takes over automatically.
+    // 3) History / stats / table / audit log refresh together every 2 s (one round of parallel requests).
+    let lastPushAt = 0, lastReadingId = null, pollBusy = false, secondaryBusy = false;
+
+    function setStreamState(live) {
+      document.getElementById('stream-pill').className = live ? 'status-pill live' : 'status-pill';
+      document.getElementById('stream-label').innerText = live ? 'LIVE HARDWARE' : 'WAITING FOR DEVICE';
+    }
+
+    function applyLatest(data) {
+      setStreamState(!data.offline && data.status !== 'WAITING_DATA');
+      currentThreshold = data.threshold || 10;
+      document.getElementById('gauge-limit-badge').innerText = 'Limit: ' + currentThreshold + '%';
+      document.getElementById('slider-val-display').innerText = currentThreshold + '%';
+      document.getElementById('threshold-slider').value = currentThreshold;
+
+      const gasVal = data.gas_percent || 0;
+      document.getElementById('kpi-gas-pct').innerText = gasVal.toFixed(1) + '%';
+      document.getElementById('kpi-raw-adc').innerText = data.raw_value || 0;
+      document.getElementById('kpi-ppm').innerText = '~' + (data.ppm_estimated || 0) + ' ppm';
+
+      const gasBar = document.getElementById('kpi-gas-bar');
+      gasBar.style.width = Math.min(100, gasVal) + '%';
+      gasBar.style.background = gasVal >= currentThreshold ? 'var(--danger)' : (gasVal >= currentThreshold * 0.75 ? 'var(--warn)' : 'var(--safe)');
+
+      updateGauge(gasVal);
+
+      // Hero Banner Updates
+      const banner = document.getElementById('hero-banner');
+      const title = document.getElementById('hero-title');
+      const desc = document.getElementById('hero-desc');
+      const heroIcon = document.getElementById('hero-icon');
+
+      let status = (data.status || 'SAFE').toUpperCase();
+      if (data.offline) status = 'OFFLINE';   // stale data must never look SAFE
+      const warnIcon = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
+      if (status === 'OFFLINE') {
+        banner.className = 'hero-banner warning';
+        title.innerText = 'DEVICE OFFLINE \u2022 NO RECENT TELEMETRY';
+        desc.innerText = 'Last reading was ' + (data.age_seconds === null ? 'unknown' : data.age_seconds + 's') + ' ago. The detector may be unpowered or disconnected - do not assume the air is safe.';
+        heroIcon.innerHTML = warnIcon;
+      } else if (status === 'FAULT') {
+        banner.className = 'hero-banner warning';
+        title.innerText = 'SENSOR FAULT \u2022 CHECK MQ-2 WIRING';
+        desc.innerText = 'The MQ-2 analog signal is lost (AO wire open or sensor unpowered). Gas detection is NOT active.';
+        heroIcon.innerHTML = warnIcon;
+      } else if (status === 'DANGER') {
+        banner.className = 'hero-banner danger';
+        title.innerText = 'CRITICAL: GAS LEAK DETECTED';
+        desc.innerText = 'High concentration of flammable gas detected! Exhaust ventilation triggered and alarm buzzer pulsing.';
+        heroIcon.innerHTML = '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>';
+      } else if (status === 'WARNING') {
+        banner.className = 'hero-banner warning';
+        title.innerText = 'ELEVATED GAS CONCENTRATION';
+        desc.innerText = 'Sensor reading is approaching the setpoint threshold. Monitoring database records closely.';
+        heroIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
+      } else if (status === 'WAITING_DATA') {
+        banner.className = 'hero-banner warning';
+        title.innerText = 'SYSTEM ARMED • WAITING FOR TELEMETRY';
+        desc.innerText = 'Backend container online. Connect ESP32 via USB Serial or Wi-Fi to stream live data.';
+        heroIcon.innerHTML = '<path d="M12 2v20M2 12h20"></path>';
+      } else {
+        banner.className = 'hero-banner safe';
+        title.innerText = 'ATMOSPHERE NOMINAL • SAFE';
+        desc.innerText = 'Atmospheric gas concentration is within normal baseline. All physical sensors monitored continuously.';
+        heroIcon.innerHTML = '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path>';
+      }
+
+      document.getElementById('hero-time').innerText = 'Synced: ' + (data.timestamp || 'Live');
+
+      // HARDWARE TWIN ACTUATOR UPDATES
+      const isDanger = (status === 'DANGER');
+
+      // Green LED: Solid when SAFE, OFF when DANGER
+      const twinGreen = document.getElementById('twin-led-green');
+      const twinGreenLbl = document.getElementById('twin-green-label');
+      if (isDanger) {
+        twinGreen.className = 'led-dome led-green-off';
+        twinGreenLbl.innerText = 'OFF';
+        twinGreenLbl.style.color = 'var(--text-light)';
+      } else {
+        twinGreen.className = 'led-dome led-green-on';
+        twinGreenLbl.innerText = 'GLOWING SOLID';
+        twinGreenLbl.style.color = 'var(--safe)';
+      }
+
+      // Red LED: Strobe Flash when DANGER, OFF when SAFE
+      const twinRed = document.getElementById('twin-led-red');
+      const twinRedLbl = document.getElementById('twin-red-label');
+      if (isDanger) {
+        twinRed.className = 'led-dome led-red-on';
+        twinRedLbl.innerText = 'FLASHING ALARM';
+        twinRedLbl.style.color = 'var(--danger)';
+      } else {
+        twinRed.className = 'led-dome led-red-off';
+        twinRedLbl.innerText = 'STANDBY (OFF)';
+        twinRedLbl.style.color = 'var(--text-light)';
+      }
+
+      // Buzzer: Active or Silent
+      const buzzerSlot = document.getElementById('twin-buzzer-slot');
+      const buzzerLbl = document.getElementById('twin-buzzer-label');
+      if (data.buzzer_state || isDanger) {
+        buzzerSlot.className = 'device-slot buzzer-active';
+        buzzerLbl.innerText = 'PULSING SIREN';
+        buzzerLbl.style.color = 'var(--danger)';
+      } else {
+        buzzerSlot.className = 'device-slot';
+        buzzerLbl.innerText = 'SILENT';
+        buzzerLbl.style.color = 'var(--text-light)';
+      }
+
+      // Append to the trend instantly instead of waiting for the next history refresh.
+      if (data.id !== undefined && data.id !== lastReadingId && typeof data.gas_percent === 'number') {
+        lastReadingId = data.id;
+        historyPoints.push(data.gas_percent);
+        if (historyPoints.length > 60) historyPoints.shift();
+        renderTrendChart();
+      }
+    }
+
+    async function pollLatest() {
+      if (pollBusy || Date.now() - lastPushAt < 3000) return;   // push stream is healthy
+      pollBusy = true;
       try {
-        // 1. Fetch Latest Telemetry
-        let streamLive = false;
-        const resLatest = await fetch('/api/sensor-data/latest');
-        if (resLatest.ok) {
-          const data = await resLatest.json();
-          streamLive = !data.offline && data.status !== 'WAITING_DATA';
-          currentThreshold = data.threshold || 10;
-          document.getElementById('gauge-limit-badge').innerText = 'Limit: ' + currentThreshold + '%';
-          document.getElementById('slider-val-display').innerText = currentThreshold + '%';
-          document.getElementById('threshold-slider').value = currentThreshold;
-
-          const gasVal = data.gas_percent || 0;
-          document.getElementById('kpi-gas-pct').innerText = gasVal.toFixed(1) + '%';
-          document.getElementById('kpi-raw-adc').innerText = data.raw_value || 0;
-          document.getElementById('kpi-ppm').innerText = '~' + (data.ppm_estimated || 0) + ' ppm';
-
-          const gasBar = document.getElementById('kpi-gas-bar');
-          gasBar.style.width = Math.min(100, gasVal) + '%';
-          gasBar.style.background = gasVal >= currentThreshold ? 'var(--danger)' : (gasVal >= currentThreshold * 0.75 ? 'var(--warn)' : 'var(--safe)');
-
-          updateGauge(gasVal);
-
-          // Hero Banner Updates
-          const banner = document.getElementById('hero-banner');
-          const title = document.getElementById('hero-title');
-          const desc = document.getElementById('hero-desc');
-          const heroIcon = document.getElementById('hero-icon');
-
-          let status = (data.status || 'SAFE').toUpperCase();
-          if (data.offline) status = 'OFFLINE';   // stale data must never look SAFE
-          const warnIcon = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
-          if (status === 'OFFLINE') {
-            banner.className = 'hero-banner warning';
-            title.innerText = 'DEVICE OFFLINE \u2022 NO RECENT TELEMETRY';
-            desc.innerText = 'Last reading was ' + (data.age_seconds === null ? 'unknown' : data.age_seconds + 's') + ' ago. The detector may be unpowered or disconnected - do not assume the air is safe.';
-            heroIcon.innerHTML = warnIcon;
-          } else if (status === 'FAULT') {
-            banner.className = 'hero-banner warning';
-            title.innerText = 'SENSOR FAULT \u2022 CHECK MQ-2 WIRING';
-            desc.innerText = 'The MQ-2 analog signal is lost (AO wire open or sensor unpowered). Gas detection is NOT active.';
-            heroIcon.innerHTML = warnIcon;
-          } else if (status === 'DANGER') {
-            banner.className = 'hero-banner danger';
-            title.innerText = 'CRITICAL: GAS LEAK DETECTED';
-            desc.innerText = 'High concentration of flammable gas detected! Exhaust ventilation triggered and alarm buzzer pulsing.';
-            heroIcon.innerHTML = '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>';
-          } else if (status === 'WARNING') {
-            banner.className = 'hero-banner warning';
-            title.innerText = 'ELEVATED GAS CONCENTRATION';
-            desc.innerText = 'Sensor reading is approaching the setpoint threshold. Monitoring database records closely.';
-            heroIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
-          } else if (status === 'WAITING_DATA') {
-            banner.className = 'hero-banner warning';
-            title.innerText = 'SYSTEM ARMED • WAITING FOR TELEMETRY';
-            desc.innerText = 'Backend container online. Connect ESP32 via USB Serial or Wi-Fi to stream live data.';
-            heroIcon.innerHTML = '<path d="M12 2v20M2 12h20"></path>';
-          } else {
-            banner.className = 'hero-banner safe';
-            title.innerText = 'ATMOSPHERE NOMINAL • SAFE';
-            desc.innerText = 'Atmospheric gas concentration is within normal baseline. All physical sensors monitored continuously.';
-            heroIcon.innerHTML = '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path>';
-          }
-
-          document.getElementById('hero-time').innerText = 'Synced: ' + (data.timestamp || 'Live');
-
-          // HARDWARE TWIN ACTUATOR UPDATES
-          const isDanger = (status === 'DANGER');
-
-          // Green LED: Solid when SAFE, OFF when DANGER
-          const twinGreen = document.getElementById('twin-led-green');
-          const twinGreenLbl = document.getElementById('twin-green-label');
-          if (isDanger) {
-            twinGreen.className = 'led-dome led-green-off';
-            twinGreenLbl.innerText = 'OFF';
-            twinGreenLbl.style.color = 'var(--text-light)';
-          } else {
-            twinGreen.className = 'led-dome led-green-on';
-            twinGreenLbl.innerText = 'GLOWING SOLID';
-            twinGreenLbl.style.color = 'var(--safe)';
-          }
-
-          // Red LED: Strobe Flash when DANGER, OFF when SAFE
-          const twinRed = document.getElementById('twin-led-red');
-          const twinRedLbl = document.getElementById('twin-red-label');
-          if (isDanger) {
-            twinRed.className = 'led-dome led-red-on';
-            twinRedLbl.innerText = 'FLASHING ALARM';
-            twinRedLbl.style.color = 'var(--danger)';
-          } else {
-            twinRed.className = 'led-dome led-red-off';
-            twinRedLbl.innerText = 'STANDBY (OFF)';
-            twinRedLbl.style.color = 'var(--text-light)';
-          }
-
-          // Buzzer: Active or Silent
-          const buzzerSlot = document.getElementById('twin-buzzer-slot');
-          const buzzerLbl = document.getElementById('twin-buzzer-label');
-          if (data.buzzer_state || isDanger) {
-            buzzerSlot.className = 'device-slot buzzer-active';
-            buzzerLbl.innerText = 'PULSING SIREN';
-            buzzerLbl.style.color = 'var(--danger)';
-          } else {
-            buzzerSlot.className = 'device-slot';
-            buzzerLbl.innerText = 'SILENT';
-            buzzerLbl.style.color = 'var(--text-light)';
-          }
-        }
-
-        // Periodic secondary sync (every 1s for history, stats, table)
-        const now = Date.now();
-        if (now - lastSecondarySync >= 1000) {
-          lastSecondarySync = now;
-
-          // 2. Fetch Chart History
-          const resHist = await fetch('/api/sensor-data/history?limit=60');
-          if (resHist.ok) {
-            const hist = await resHist.json();
-            if (hist.readings && hist.readings.length > 0) {
-              historyPoints = hist.readings.map(r => r.gas_percent);
-            } else {
-              historyPoints = [];
-            }
-            renderTrendChart();
-          }
-
-          // 3. Fetch KPI Summary Stats
-          const resStats = await fetch('/api/statistics');
-          if (resStats.ok) {
-            const s = await resStats.json();
-            document.getElementById('kpi-total-readings').innerText = (s.total_readings || 0).toLocaleString();
-            document.getElementById('db-counter-badge').innerText = (s.total_readings || 0) + ' Records';
-          }
-
-          // 4. Fetch Table Records
-          const resRecent = await fetch('/api/sensor-data/history?limit=12');
-          if (resRecent.ok) {
-            const d = await resRecent.json();
-            const tbody = document.getElementById('table-body');
-            if (d.readings && d.readings.length > 0) {
-              const reversed = [...d.readings].reverse();
-              tbody.innerHTML = reversed.map(r => `
-                <tr>
-                  <td>#${r.id}</td>
-                  <td>${r.timestamp}</td>
-                  <td>${r.device_id}</td>
-                  <td>${r.raw_value}</td>
-                  <td style="font-weight:700; color: ${r.gas_percent >= currentThreshold ? 'var(--danger)' : 'var(--safe)'};">${r.gas_percent.toFixed(1)}%</td>
-                  <td>~${r.ppm_estimated} ppm</td>
-                  <td><span class="badge ${r.status === 'DANGER' ? 'badge-danger' : (r.status === 'WARNING' ? 'badge-warn' : 'badge-safe')}">${r.status}</span></td>
-                  <td>${r.buzzer_state ? '<span style="color:var(--danger); font-weight:700;">ACTIVE</span>' : '<span style="color:var(--text-light);">OFF</span>'}</td>
-                </tr>
-              `).join('');
-            } else {
-              tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No telemetry recorded yet. Real-time readings stream automatically.</td></tr>';
-            }
-          }
-
-          // 5. Fetch Events Audit Feed
-          const resEvents = await fetch('/api/events');
-          if (resEvents.ok) {
-            const evs = await resEvents.json();
-            const container = document.getElementById('events-container');
-            if (evs && evs.length > 0) {
-              container.innerHTML = evs.slice(0, 8).map(e => `
-                <div class="event-item">
-                  <span style="font-weight: 600; color: ${e.severity === 'CRITICAL' ? 'var(--danger)' : (e.severity === 'WARNING' ? 'var(--warn)' : 'var(--text-main)')};">${e.message}</span>
-                  <span class="event-time">${e.timestamp.split(' ')[1] || e.timestamp}</span>
-                </div>
-              `).join('');
-            } else {
-              container.innerHTML = '<div style="color: var(--text-light); font-size: 0.78rem; text-align: center; padding: 1rem;">No events logged.</div>';
-            }
-          }
-        }
-
-        document.getElementById('stream-pill').className = streamLive ? 'status-pill live' : 'status-pill';
-        document.getElementById('stream-label').innerText = streamLive ? 'LIVE HARDWARE' : 'WAITING FOR DEVICE';
-
+        const res = await fetch('/api/sensor-data/latest', { cache: 'no-store' });
+        if (res.ok) applyLatest(await res.json());
       } catch (err) {
         document.getElementById('stream-pill').className = 'status-pill';
         document.getElementById('stream-label').innerText = 'RECONNECTING...';
-      }
+      } finally { pollBusy = false; }
+    }
+
+    async function syncSecondary() {
+      if (secondaryBusy) return;
+      secondaryBusy = true;
+      try {
+        const [rHist, rStats, rEvents] = await Promise.all([
+          fetch('/api/sensor-data/history?limit=60', { cache: 'no-store' }),
+          fetch('/api/statistics', { cache: 'no-store' }),
+          fetch('/api/events', { cache: 'no-store' })
+        ]);
+
+        if (rHist.ok) {
+          const hist = await rHist.json();
+          const readings = hist.readings || [];
+          historyPoints = readings.map(r => r.gas_percent);
+          if (readings.length) lastReadingId = readings[readings.length - 1].id;
+          renderTrendChart();
+
+          const tbody = document.getElementById('table-body');
+          if (readings.length > 0) {
+            tbody.innerHTML = readings.slice(-12).reverse().map(r => `
+              <tr>
+                <td>#${r.id}</td>
+                <td>${r.timestamp}</td>
+                <td>${r.device_id}</td>
+                <td>${r.raw_value}</td>
+                <td style="font-weight:700; color: ${r.gas_percent >= currentThreshold ? 'var(--danger)' : 'var(--safe)'};">${r.gas_percent.toFixed(1)}%</td>
+                <td>~${r.ppm_estimated} ppm</td>
+                <td><span class="badge ${r.status === 'DANGER' ? 'badge-danger' : (r.status === 'WARNING' ? 'badge-warn' : 'badge-safe')}">${r.status}</span></td>
+                <td>${r.buzzer_state ? '<span style="color:var(--danger); font-weight:700;">ACTIVE</span>' : '<span style="color:var(--text-light);">OFF</span>'}</td>
+              </tr>
+            `).join('');
+          } else {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No telemetry recorded yet. Real-time readings stream automatically.</td></tr>';
+          }
+        }
+
+        if (rStats.ok) {
+          const st = await rStats.json();
+          document.getElementById('kpi-total-readings').innerText = (st.total_readings || 0).toLocaleString();
+          document.getElementById('db-counter-badge').innerText = (st.total_readings || 0) + ' Records';
+        }
+
+        if (rEvents.ok) {
+          const evs = await rEvents.json();
+          const container = document.getElementById('events-container');
+          if (evs && evs.length > 0) {
+            container.innerHTML = evs.slice(0, 8).map(e => `
+              <div class="event-item">
+                <span style="font-weight: 600; color: ${e.severity === 'CRITICAL' ? 'var(--danger)' : (e.severity === 'WARNING' ? 'var(--warn)' : 'var(--text-main)')};">${e.message}</span>
+                <span class="event-time">${e.timestamp.split(' ')[1] || e.timestamp}</span>
+              </div>
+            `).join('');
+          } else {
+            container.innerHTML = '<div style="color: var(--text-light); font-size: 0.78rem; text-align: center; padding: 1rem;">No events logged.</div>';
+          }
+        }
+      } catch (err) { /* next cycle retries */ }
+      finally { secondaryBusy = false; }
+    }
+
+    function connectStream() {
+      if (!window.EventSource) return;
+      const es = new EventSource('/api/stream');
+      es.addEventListener('reading', ev => {
+        lastPushAt = Date.now();
+        try { applyLatest(JSON.parse(ev.data)); } catch (e) { /* ignore malformed frame */ }
+      });
+      es.onerror = () => { lastPushAt = 0; };   // EventSource reconnects itself; polling covers the gap
     }
 
     // Actuator Controls
     async function triggerDrill() {
       await fetch('/api/test-alarm', { method: 'POST' });
-      syncBackend();
+      pollLatestNow();
     }
 
     async function onThresholdChange(val) {
@@ -1472,7 +1490,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ threshold: parseInt(val) })
       });
-      syncBackend();
+      pollLatestNow();
     }
 
     async function purgeDatabase() {
@@ -1480,14 +1498,17 @@
         const res = await fetch('/api/database/clear', { method: 'POST' });
         if (res.ok) {
           historyPoints = new Array(60).fill(0);
-          syncBackend();
+          pollLatestNow();
         }
       }
     }
 
-    let lastSecondarySync = 0;
-    setInterval(syncBackend, 250);
-    syncBackend();
+    function pollLatestNow() { lastPushAt = 0; pollLatest(); syncSecondary(); }
+    connectStream();
+    pollLatest();
+    syncSecondary();
+    setInterval(pollLatest, 500);
+    setInterval(syncSecondary, 2000);
   </script>
 </body>
 </html>

@@ -12,6 +12,7 @@ Runs natively via `python app.py` or inside Docker container via `docker-compose
 import http.server
 import urllib.parse
 import json
+import threading
 import os
 import sys
 import time
@@ -36,6 +37,30 @@ prev_device_status = {}
 
 # A device that has not reported for this long is shown as OFFLINE (never as a stale "SAFE").
 OFFLINE_AFTER_SECONDS = 15
+
+# ---- Live push (Server-Sent Events): every ingest wakes all dashboards instantly -------------
+_stream_cond = threading.Condition()
+_stream_version = 0
+
+def snapshot_json():
+    """Latest reading + threshold + freshness, exactly what /api/sensor-data/latest returns."""
+    latest = get_latest_reading()
+    threshold = current_threshold()
+    if latest:
+        latest["threshold"] = threshold
+        latest["age_seconds"] = reading_age_seconds(latest["timestamp"])
+        latest["offline"] = latest["age_seconds"] is None or latest["age_seconds"] > OFFLINE_AFTER_SECONDS
+    else:
+        latest = {"raw_value": None, "gas_percent": None, "ppm_estimated": None, "status": "WAITING_DATA",
+                  "buzzer_state": 0, "threshold": threshold, "timestamp": "Awaiting first reading...",
+                  "age_seconds": None, "offline": False}
+    return latest
+
+def publish():
+    global _stream_version
+    with _stream_cond:
+        _stream_version += 1
+        _stream_cond.notify_all()
 
 def current_threshold():
     return int(get_config("threshold", DEFAULT_THRESHOLD))
@@ -95,20 +120,27 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
 
         # 1. Latest Reading API
         if path == "/api/sensor-data/latest":
-            latest = get_latest_reading()
-            threshold = current_threshold()
-            if latest:
-                latest["threshold"] = threshold
-                latest["age_seconds"] = reading_age_seconds(latest["timestamp"])
-                latest["offline"] = latest["age_seconds"] is None or latest["age_seconds"] > OFFLINE_AFTER_SECONDS
-                self.send_json(200, latest)
-            else:
-                self.send_json(200, {
-                    "raw_value": None, "gas_percent": None, "ppm_estimated": None,
-                    "status": "WAITING_DATA", "buzzer_state": 0,
-                    "threshold": threshold,
-                    "timestamp": "Awaiting first reading..."
-                })
+            self.send_json(200, snapshot_json())
+            return
+
+        # 1b. Live push stream (SSE): new reading => dashboard updates in milliseconds
+        if path == "/api/stream":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache, no-transform")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+            seen = -1
+            try:
+                while True:
+                    with _stream_cond:
+                        if _stream_version == seen:
+                            _stream_cond.wait(timeout=5)   # timeout => refresh age/offline + detect dead clients
+                        seen = _stream_version
+                    self.wfile.write(("event: reading\ndata: " + json.dumps(snapshot_json()) + "\n\n").encode("utf-8"))
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionError, OSError):
+                pass
             return
 
         # 2. Historical Chart Data API
@@ -240,6 +272,7 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
             elif status != "FAULT" and prev_status == "FAULT":
                 insert_event("SENSOR_RECOVERED", f"MQ-2 signal restored on {device_id}", "INFO")
             prev_device_status[device_id] = status
+            publish()
 
             # Return response to ESP32 with current threshold
             threshold = current_threshold()
@@ -260,6 +293,7 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
             if val is not None and THRESHOLD_MIN <= val <= THRESHOLD_MAX:
                 set_config("threshold", val)
                 insert_event("CONFIG_CHANGE", f"Alarm setpoint updated to {val}%", "INFO")
+                publish()
                 self.send_json(200, {"status": "success", "threshold": val})
                 return
             self.send_json(400, {"error": f"Invalid threshold value ({THRESHOLD_MIN}-{THRESHOLD_MAX})"})
@@ -284,6 +318,7 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
             conn.commit()
             conn.close()
             prev_device_status.clear()
+            publish()
             self.send_json(200, {"status": "success", "message": "Database cleared successfully"})
             return
 
