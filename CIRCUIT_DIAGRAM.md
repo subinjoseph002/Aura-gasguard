@@ -104,10 +104,22 @@ COMMON GND ─────►  GND ─┤ 14                   17 ├─ GND
 - **Test with gas:** after the green LED stops blinking (20 s) hold an *unlit* lighter (gas only, no flame) near
   the sensor for 2-3 s. The serial `Gas:` value must climb past 10 % and the red LED + buzzer must pulse.
 
-### 4. Status LED meanings
-| Green | Red | Meaning |
-| :--- | :--- | :--- |
-| blinking | off | Warm-up (20 s), alarm disabled |
-| solid | off | Safe |
-| off | strobing + buzzer pulses | **GAS ALARM** (fan relay ON) |
-| off | slow blink | **Sensor fault** (A0 signal lost) |
+### 4. Status LED meanings (firmware v4.1)
+| Green | Red | Buzzer | Meaning |
+| :--- | :--- | :--- | :--- |
+| **solid** | off | silent | Idle / normal (also during the 20 s warm-up, when the alarm is disabled) |
+| off | **flashing** | **beeping** | **GAS ALARM** - starts within ~100 ms of the reading passing the limit (fan relay ON) |
+| off | one brief blip every 2 s | silent | Sensor signal missing for more than 5 s (check `A0`, `VCC`, `GND`) |
+
+A signal dip shorter than 5 s (loose jumper wobble, power dip) is ignored and never changes the LEDs.
+
+### 5. "Sensor signal lost" / MQ-9 notes
+- The dashboard event *"signal lost for 5 s"* means the analog reading stayed near 0 for 5 s. Causes, most likely first:
+  1. Loose jumper on the sensor's `VCC`, `GND` or `A0` (breadboards are notorious - push the wires in firmly or solder).
+  2. Sensor powered from `3V3` instead of `VIN` (5 V). The heater needs 5 V.
+  3. `A0` wired to the wrong pin (use D34, or D32 - both are auto-detected).
+  4. Weak USB port/cable: the board restarts. The boot log prints `Reset reason: ... BROWNOUT`. Use a good cable /
+     5 V 1 A supply and add a 470-1000 uF capacitor between `VIN` and `GND` near the sensor.
+- Sensor model label: `SENSOR_NAME` in `include/config.h` (default `"MQ-9"`; serial bridge: `SENSOR_TYPE` env var).
+- A brand-new MQ sensor needs a long first burn-in (datasheets say 24-48 h powered) before readings settle;
+  the firmware re-measures clean air at every boot, so always power it up in clean air.

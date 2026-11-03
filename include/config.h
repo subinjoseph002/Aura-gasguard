@@ -40,9 +40,14 @@
 #define DEFAULT_THRESHOLD_PCT   10      // alarm at >= 10 % (user-adjustable 5..95)
 #define WARMUP_MS               20000UL // MQ-2 heater needs ~20 s to stabilise
 #define BASELINE_WINDOW_MS      3000UL  // last part of warm-up averaged into the clean-air baseline
-#define TRIGGER_SAMPLES         3       // consecutive 100 ms samples over limit before alarming
-#define SENSOR_MIN_VALID_RAW    50      // below this the AO wire is open / sensor unpowered => FAULT
+#define SAMPLE_INTERVAL_MS      50      // sensor sampled 20x per second
+#define TRIGGER_SAMPLES         2       // consecutive samples over limit before alarming (~100 ms)
+                                        // (a reading >= 2x the limit alarms on the very first sample)
+#define SENSOR_MIN_VALID_RAW    20      // below this the AO signal is considered missing
+#define FAULT_HOLD_MS           5000UL  // ...and only after it stays missing this long, so a brief
+                                        // wire wobble / power dip never changes the LEDs
                                         // (a saturated 4095 is NOT a fault: it means a lot of gas)
+#define SENSOR_NAME             "MQ-9"  // label sent to the dashboard (MQ-2, MQ-9, ...)
 
 // ---- Exhaust fan relay (optional, see CIRCUIT_DIAGRAM.md) ------------------------------
 #define PIN_RELAY         14

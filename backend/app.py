@@ -268,9 +268,10 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
             elif status != "DANGER" and prev_status == "DANGER":
                 insert_event("ALARM_CLEARED", f"✅ Gas concentration cleared on {device_id}: {gas_pct:.1f}%", "INFO")
             if status == "FAULT" and prev_status != "FAULT":
-                insert_event("SENSOR_FAULT", f"⚠️ {device_id}: MQ-2 signal lost - check the AO wire and 5V supply", "WARNING")
+                sensor = str(payload.get("sensor_type", "Gas sensor"))[:16]
+                insert_event("SENSOR_FAULT", f"⚠️ {device_id}: {sensor} signal lost for 5 s - check A0 wire, VCC (5V) and GND", "WARNING")
             elif status != "FAULT" and prev_status == "FAULT":
-                insert_event("SENSOR_RECOVERED", f"MQ-2 signal restored on {device_id}", "INFO")
+                insert_event("SENSOR_RECOVERED", f"Gas sensor signal restored on {device_id}", "INFO")
             prev_device_status[device_id] = status
             publish()
 

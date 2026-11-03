@@ -22,6 +22,7 @@
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <ESPmDNS.h>
+#include <esp_system.h>
 #include "config.h"
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -52,6 +53,8 @@ int           overCount      = 0;
 int           faultCount     = 0;
 bool          wasFault       = false;
 unsigned long settleUntil    = 0;
+unsigned long lastRedetect   = 0;
+bool          prevAlarm      = false;
 bool          fanManual      = false;
 bool          alarmTestActive = false;
 unsigned long testAlarmEnd   = 0;
@@ -82,7 +85,7 @@ int readAdc(int pin, int samples) {
   return (int)(sum / samples);
 }
 
-// Decide whether the MQ-2 AO is wired to GPIO 34 or GPIO 32. GPIO 32 gets an internal
+// Decide whether the MQ AO is wired to GPIO 34 or GPIO 32. GPIO 32 gets an internal
 // pull-down: a floating (unconnected) pin collapses to ~0, a pin driven by the sensor does not.
 void detectSensor() {
   pinMode(PIN_MQ_B, INPUT_PULLDOWN);
@@ -90,7 +93,7 @@ void detectSensor() {
   int b = readAdc(PIN_MQ_B, 32);
   pinMode(PIN_MQ_B, INPUT);
   int a = readAdc(PIN_MQ_A, 32);
-  sensorPin = (b > 150) ? PIN_MQ_B : PIN_MQ_A;
+  sensorPin = (b > 60) ? PIN_MQ_B : PIN_MQ_A;
   Serial.printf("[SENSOR] GPIO%d(pulled-down)=%d GPIO%d=%d -> using GPIO%d\n",
                 PIN_MQ_B, b, PIN_MQ_A, a, sensorPin);
 }
@@ -121,7 +124,7 @@ void telemetryTask(void*) {
 
     float pct = gasPercent;
     int ppm = (int)((pct / 100.0f) * 1200 + 15);
-    String json = "{\"device_id\":\"" DEVICE_ID "\",\"sensor_type\":\"MQ-2\"";
+    String json = "{\"device_id\":\"" DEVICE_ID "\",\"sensor_type\":\"" SENSOR_NAME "\"";
     json += ",\"raw_value\":" + String(gasRawValue);
     json += ",\"gas_percent\":" + String(pct, 1);
     json += ",\"ppm_estimated\":" + String(ppm);
@@ -228,7 +231,12 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   bootTime = millis();
-  Serial.println("\n=======================================================");
+  esp_reset_reason_t rr = esp_reset_reason();
+  Serial.printf("\n[BOOT] Reset reason: %d (%s)\n", (int)rr,
+                rr == ESP_RST_POWERON ? "power-on" : rr == ESP_RST_SW ? "software/upload" :
+                rr == ESP_RST_BROWNOUT ? "BROWNOUT - weak USB/5V supply!" :
+                rr == ESP_RST_PANIC ? "crash" : rr == ESP_RST_EXT ? "reset button" : "other/watchdog");
+  Serial.println("=======================================================");
   Serial.println("  AURA GASGUARD - ESP32 GAS LEAKAGE DETECTION v4.0");
   Serial.printf("  Threshold: %d%% | Warm-up: %lus | Buzzer: %s\n", DEFAULT_THRESHOLD_PCT,
                 WARMUP_MS / 1000, BUZZER_ACTIVE_LOW ? "active-LOW" : "active-HIGH");
@@ -288,7 +296,11 @@ void sampleSensor(unsigned long now) {
   int raw = readAdc(sensorPin, 16);
   gasRawValue = raw;
   faultCount = (raw < SENSOR_MIN_VALID_RAW) ? faultCount + 1 : 0;
-  sensorFault = faultCount >= 10;
+  sensorFault = faultCount >= (int)(FAULT_HOLD_MS / SAMPLE_INTERVAL_MS);
+  if (sensorFault && now - lastRedetect >= 5000) {   // wiring may have changed: look at both pins again
+    lastRedetect = now;
+    detectSensor();
+  }
   if (wasFault && !sensorFault && !isWarmingUp) {   // wire reconnected: re-learn clean air first
     settleUntil = now + 5000;
     Serial.println("[SENSOR] Signal restored - re-calibrating baseline for 5 s");
@@ -313,6 +325,12 @@ void sampleSensor(unsigned long now) {
     return;
   }
 
+  if (raw < SENSOR_MIN_VALID_RAW) {         // signal momentarily missing: never learn it, never alarm on it
+    gasPercent = 0.0f;
+    overCount = 0;
+    return;
+  }
+
   if ((long)(now - settleUntil) < 0) {     // settling after a fault: follow the signal, no alarms
     cleanAirBase = (float)raw;
     gasPercent = 0.0f;
@@ -327,7 +345,7 @@ void sampleSensor(unsigned long now) {
   // Baseline tracks slow ambient drift only; a real leak (>2 %) is never absorbed.
   if (!isGasDanger) {
     if (raw < cleanAirBase)  cleanAirBase += (raw - cleanAirBase) * 0.05f;
-    else if (pct < 2.0f)     cleanAirBase += (raw - cleanAirBase) / 600.0f;
+    else if (pct < 2.0f)     cleanAirBase += (raw - cleanAirBase) / 1200.0f;
   }
 
   bool digitalTrigger = false;
@@ -335,8 +353,9 @@ void sampleSensor(unsigned long now) {
   digitalTrigger = (digitalRead(PIN_MQ_DO) == LOW);
 #endif
   overCount = (pct >= gasThresholdPercent || digitalTrigger) ? min(overCount + 1, 255) : 0;
+  int needed = (pct >= gasThresholdPercent * 2.0f) ? 1 : TRIGGER_SAMPLES;   // strong gas: alarm at once
 
-  if (!isGasDanger && overCount >= TRIGGER_SAMPLES) {
+  if (!isGasDanger && overCount >= needed) {
     isGasDanger = true;
     telemetryNow = true;
     Serial.printf("\n[ALARM TRIGGERED] %.1f%% >= %d%% (raw %d)\n\n", pct, (int)gasThresholdPercent, raw);
@@ -353,24 +372,25 @@ void updateActuators(unsigned long now) {
   bool alarm = isGasDanger || alarmTestActive;
 
   if (alarm) {
-    if (now - lastBeat >= 180) { lastBeat = now; beat = !beat; }
+    if (!prevAlarm) { beat = true; lastBeat = now; }       // first beep + red flash start immediately
+    else if (now - lastBeat >= 180) { lastBeat = now; beat = !beat; }
     buzzerAudible = beat && !isBuzzerMuted;
     driveBuzzer(buzzerAudible);
-    digitalWrite(PIN_LED_RED, beat ? HIGH : LOW);
+    digitalWrite(PIN_LED_RED, beat ? HIGH : LOW);          // red flashes with the buzzer
     digitalWrite(PIN_LED_GREEN, LOW);
   } else {
     beat = false;
     buzzerAudible = false;
     driveBuzzer(false);
-    bool slow = ((now / 500) % 2) == 0;
-    if (sensorFault) {                     // red slow blink = wiring/sensor problem
-      digitalWrite(PIN_LED_RED, slow ? HIGH : LOW);
+    if (sensorFault) {                                     // sensor signal gone > 5 s: green off, brief red blip
+      digitalWrite(PIN_LED_RED, (now % 2000) < 100 ? HIGH : LOW);
       digitalWrite(PIN_LED_GREEN, LOW);
-    } else {
+    } else {                                               // idle / normal / warm-up: green STEADY
       digitalWrite(PIN_LED_RED, LOW);
-      digitalWrite(PIN_LED_GREEN, (isWarmingUp && !slow) ? LOW : HIGH);
+      digitalWrite(PIN_LED_GREEN, HIGH);
     }
   }
+  prevAlarm = alarm;
   driveRelay(isGasDanger || fanManual);
 }
 
@@ -399,7 +419,7 @@ void loop() {
   pollSerialCommands();
   unsigned long now = millis();
 
-  if (now - lastSensorRead >= 100) {
+  if (now - lastSensorRead >= SAMPLE_INTERVAL_MS) {
     lastSensorRead = now;
     sampleSensor(now);
   }

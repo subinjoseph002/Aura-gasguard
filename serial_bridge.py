@@ -165,7 +165,7 @@ def main():
                 status = match.group(4).upper()
                 payload = {
                     "device_id": "ESP32-GAS-01",
-                    "sensor_type": "MQ-2",
+                    "sensor_type": os.environ.get("SENSOR_TYPE", "MQ-9"),
                     "raw_value": int(match.group(2)),
                     "gas_percent": gas_pct,
                     "ppm_estimated": int((gas_pct / 100.0) * 1200 + 15),

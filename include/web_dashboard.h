@@ -877,7 +877,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <!-- Primary Gas Sensor Column -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">🔥 Gas Concentration Matrix (MQ-2)</div>
+          <div class="card-title">🔥 Gas Concentration Matrix</div>
           <span class="pill" id="sensor-mode-pill">GPIO 34 • ADC1</span>
         </div>
 
@@ -1362,8 +1362,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
       if (data.status === 'FAULT') {
         banner.className = 'hazard-banner warning';
-        title.innerHTML = '\u26a0\ufe0f SENSOR FAULT: CHECK MQ-2 WIRING';
-        desc.innerText = 'The MQ-2 analog signal is lost (AO wire open or sensor unpowered). Gas detection is NOT active.';
+        title.innerHTML = '\u26a0\ufe0f SENSOR FAULT: CHECK GAS SENSOR WIRING';
+        desc.innerText = 'The gas sensor analog signal has been missing for over 5 s (A0 wire loose, or no 5V/GND on the sensor). Gas detection is NOT active.';
         emoji.innerText = '\u26a0\ufe0f';
         safety.className = 'safety-actions';
         prevStatus = data.status;
