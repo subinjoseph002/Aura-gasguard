@@ -40,6 +40,14 @@
 #define DEFAULT_THRESHOLD_PCT   10      // alarm at >= 10 % (user-adjustable 5..95)
 #define WARMUP_MS               20000UL // MQ-2 heater needs ~20 s to stabilise
 #define BASELINE_WINDOW_MS      3000UL  // last part of warm-up averaged into the clean-air baseline
+// Gas % = (reading - clean-air baseline) / GAS_SPAN_COUNTS. 1500 counts (~1.2 V) of rise = 100 %, so the
+// default 10 % alarm fires at +150 counts (~0.12 V) - a lighter puff does that in a second or two.
+// Raise it for a less sensitive detector, lower it for a more sensitive one.
+#define GAS_SPAN_COUNTS         1500
+// Early warning: a fast rise (>= RISE_TRIGGER_COUNTS within ~1 s) alarms before the % limit is reached.
+#define RISE_TRIGGER_COUNTS     60
+#define RISE_WINDOW_SAMPLES     20      // 20 x 50 ms = 1 s
+#define ALARM_MIN_HOLD_MS       3000UL  // an alarm never clears sooner than this (no beep flicker)
 #define SAMPLE_INTERVAL_MS      50      // sensor sampled 20x per second
 #define TRIGGER_SAMPLES         2       // consecutive samples over limit before alarming (~100 ms)
                                         // (a reading >= 2x the limit alarms on the very first sample)

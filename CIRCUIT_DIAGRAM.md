@@ -126,3 +126,15 @@ want a loose-wire warning. A reading that falls back to 0 always clears an activ
 - Sensor model label: `SENSOR_NAME` in `include/config.h` (default `"MQ-9"`; serial bridge: `SENSOR_TYPE` env var).
 - A brand-new MQ sensor needs a long first burn-in (datasheets say 24-48 h powered) before readings settle;
   the firmware re-measures clean air at every boot, so always power it up in clean air.
+
+### 6. Tuning detection speed / sensitivity (`include/config.h`)
+| Setting | Default | Effect |
+| :--- | :--- | :--- |
+| `GAS_SPAN_COUNTS` | 1500 | Counts of rise that equal 100 %. The 10 % alarm fires at +150 counts (~0.12 V). **Lower = more sensitive** (e.g. 1000 -> +100 counts), higher = less. |
+| `RISE_TRIGGER_COUNTS` | 60 | A rise of this many counts within ~1 s alarms immediately (lighter puff), even below the % limit. |
+| `TRIGGER_SAMPLES` / `SAMPLE_INTERVAL_MS` | 2 / 50 ms | ~100 ms confirmation. |
+| `ALARM_MIN_HOLD_MS` | 3000 | An alarm never clears sooner (no beep flicker). |
+
+The firmware reacts within ~0.5 s of a gas rise starting. Any further delay is the sensor itself: an MQ element has to
+heat-react to the gas, which takes a second or more, and modules whose clean-air output is below the ESP32 ADC dead
+zone (~0.1 V) show nothing until the signal climbs past it. The serial `Raw ADC` value shows exactly what the ESP32 sees.

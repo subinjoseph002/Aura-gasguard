@@ -8,7 +8,8 @@
  *
  *  Safety logic
  *    - 20 s warm-up: alarm disabled, clean-air baseline measured from the last 3 s.
- *    - Gas % = (ADC - baseline) / (4095 - baseline), alarm when >= threshold (default 10 %)
+ *    - Gas % = (ADC - baseline) / GAS_SPAN_COUNTS, alarm when >= threshold (default 10 %)
+ *      or when the reading rises >= RISE_TRIGGER_COUNTS within ~1 s (early warning)
  *      for 3 consecutive samples (300 ms), cleared with 2.5 % hysteresis.
  *    - Sensor wire open / unpowered => FAULT (red LED slow blink, reported to backend).
  *    - Buzzer polarity handled in ONE place (driveBuzzer) - idle level is always "off".
@@ -54,6 +55,13 @@ int           faultCount     = 0;
 bool          wasFault       = false;
 unsigned long settleUntil    = 0;
 unsigned long lastRedetect   = 0;
+int           riseHist[RISE_WINDOW_SAMPLES];
+int           riseIdx        = 0;
+bool          riseFilled     = false;
+int           rateCount      = 0;
+bool          rateTriggered  = false;
+float         alarmPeakPct   = 0.0f;
+unsigned long alarmHoldUntil = 0;
 bool          prevAlarm      = false;
 bool          fanManual      = false;
 bool          alarmTestActive = false;
@@ -329,6 +337,8 @@ void sampleSensor(unsigned long now) {
   if (raw < SENSOR_MIN_VALID_RAW) {         // dead zone / no signal: never learn it, never raise an alarm
     gasPercent = 0.0f;                      // on it, and a reading back at 0 means the gas is gone
     overCount = 0;
+    rateCount = 0;
+    riseFilled = false; riseIdx = 0;        // history has a gap: restart the rise window
     if (isGasDanger) {
       isGasDanger = false;
       isBuzzerMuted = false;
@@ -342,10 +352,12 @@ void sampleSensor(unsigned long now) {
     cleanAirBase = (float)raw;
     gasPercent = 0.0f;
     overCount = 0;
+    rateCount = 0;
+    riseFilled = false; riseIdx = 0;
     return;
   }
 
-  float pct = (raw > cleanAirBase) ? (raw - cleanAirBase) / (4095.0f - cleanAirBase) * 100.0f : 0.0f;
+  float pct = (raw > cleanAirBase) ? (raw - cleanAirBase) / (float)GAS_SPAN_COUNTS * 100.0f : 0.0f;
   if (pct > 100.0f) pct = 100.0f;
   gasPercent = pct;
 
@@ -362,12 +374,28 @@ void sampleSensor(unsigned long now) {
   overCount = (pct >= gasThresholdPercent || digitalTrigger) ? min(overCount + 1, 255) : 0;
   int needed = (pct >= gasThresholdPercent * 2.0f) ? 1 : TRIGGER_SAMPLES;   // strong gas: alarm at once
 
-  if (!isGasDanger && overCount >= needed) {
+  if (isGasDanger && pct > alarmPeakPct) alarmPeakPct = pct;
+
+  // Rate-of-rise: compare with the reading ~1 s ago (ring buffer holds the last RISE_WINDOW_SAMPLES).
+  int oldRaw = riseHist[riseIdx];
+  riseHist[riseIdx] = raw;
+  riseIdx = (riseIdx + 1) % RISE_WINDOW_SAMPLES;
+  if (riseIdx == 0) riseFilled = true;
+  bool fastRise = riseFilled && (raw - oldRaw >= RISE_TRIGGER_COUNTS) && (raw - cleanAirBase >= RISE_TRIGGER_COUNTS);
+  rateCount = fastRise ? min(rateCount + 1, 255) : 0;
+
+  if (!isGasDanger && (overCount >= needed || rateCount >= 2)) {
     isGasDanger = true;
+    rateTriggered = overCount < needed;
+    alarmPeakPct = pct;
+    alarmHoldUntil = now + ALARM_MIN_HOLD_MS;
     telemetryNow = true;
-    Serial.printf("\n[ALARM TRIGGERED] %.1f%% >= %d%% (raw %d)\n\n", pct, (int)gasThresholdPercent, raw);
-  } else if (isGasDanger && pct < gasThresholdPercent - 2.5f && !digitalTrigger) {
+    Serial.printf("\n[ALARM TRIGGERED] %.1f%% (limit %d%%, raw %d)%s\n\n", pct, (int)gasThresholdPercent, raw,
+                  rateTriggered ? " - fast rise" : "");
+  } else if (isGasDanger && (long)(now - alarmHoldUntil) >= 0 && !digitalTrigger &&
+             pct < (rateTriggered ? max(2.0f, alarmPeakPct * 0.5f) : gasThresholdPercent - 2.5f)) {
     isGasDanger = false;
+    rateTriggered = false;
     isBuzzerMuted = false;                 // a mute only ever lasts for one alarm
     telemetryNow = true;
     Serial.printf("\n[ALARM CLEARED] %.1f%%\n\n", pct);
