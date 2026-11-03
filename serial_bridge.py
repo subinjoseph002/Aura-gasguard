@@ -35,7 +35,7 @@ except ImportError:
     HTTP_SESSION = None
     USE_REQUESTS = False
 
-BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:5000/api/sensor-data")
+BACKEND_URL = os.environ.get("BACKEND_URL", "https://aura-gasguard.onrender.com/api/sensor-data")
 DEFAULT_BAUD = 115200
 
 TELEMETRY_PATTERN = re.compile(
