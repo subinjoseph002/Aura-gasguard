@@ -11,8 +11,16 @@
 #define PIN_MQ_A          34
 #define PIN_MQ_B          32
 #define PIN_BUZZER        25
+// Red = alarm (with buzzer), green = idle/safe. If they look swapped on your board, the LEDs are
+// plugged into each other's pins: either swap the wires (red -> D26, green -> D27) or set this to 1.
+#define LEDS_SWAPPED      1
+#if LEDS_SWAPPED
+#define PIN_LED_RED       27
+#define PIN_LED_GREEN     26
+#else
 #define PIN_LED_RED       26
 #define PIN_LED_GREEN     27
+#endif
 
 // ---- Buzzer --------------------------------------------------------------------------
 // 3-pin transistor buzzer modules (as in CIRCUIT_DIAGRAM.md) sound when the signal is LOW.
