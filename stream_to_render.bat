@@ -14,7 +14,8 @@ start https://aura-gasguard.onrender.com
 set PYTHONUNBUFFERED=1
 set BACKEND_URL=https://aura-gasguard.onrender.com/api/sensor-data
 
-python -u serial_bridge.py
+python -m pip install -q -r "%~dp0requirements.txt"
+python -u "%~dp0serial_bridge.py"
 if errorlevel 1 (
     echo.
     echo [ERROR] Python execution exited with an error. Check if pyserial or requests is installed.

@@ -10,9 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=5000 \
     DATABASE_PATH=/app/data/sensor_database.db
 
-# Install dependencies if any
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt || true
+# Backend is stdlib-only, so there is nothing to pip install.
 
 # Copy application source code
 COPY . .

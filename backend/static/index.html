@@ -1085,7 +1085,7 @@
             <span>Safety Alarm Threshold Setpoint</span>
             <span class="slider-val-tag" id="slider-val-display">40%</span>
           </div>
-          <input type="range" id="threshold-slider" min="10" max="90" value="40" oninput="onThresholdChange(this.value)">
+          <input type="range" id="threshold-slider" min="5" max="90" value="10" oninput="onThresholdChange(this.value)">
         </div>
 
         <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4;">
@@ -1276,10 +1276,12 @@
     async function syncBackend() {
       try {
         // 1. Fetch Latest Telemetry
+        let streamLive = false;
         const resLatest = await fetch('/api/sensor-data/latest');
         if (resLatest.ok) {
           const data = await resLatest.json();
-          currentThreshold = data.threshold || 40;
+          streamLive = !data.offline && data.status !== 'WAITING_DATA';
+          currentThreshold = data.threshold || 10;
           document.getElementById('gauge-limit-badge').innerText = 'Limit: ' + currentThreshold + '%';
           document.getElementById('slider-val-display').innerText = currentThreshold + '%';
           document.getElementById('threshold-slider').value = currentThreshold;
@@ -1301,8 +1303,20 @@
           const desc = document.getElementById('hero-desc');
           const heroIcon = document.getElementById('hero-icon');
 
-          const status = (data.status || 'SAFE').toUpperCase();
-          if (status === 'DANGER') {
+          let status = (data.status || 'SAFE').toUpperCase();
+          if (data.offline) status = 'OFFLINE';   // stale data must never look SAFE
+          const warnIcon = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
+          if (status === 'OFFLINE') {
+            banner.className = 'hero-banner warning';
+            title.innerText = 'DEVICE OFFLINE \u2022 NO RECENT TELEMETRY';
+            desc.innerText = 'Last reading was ' + (data.age_seconds === null ? 'unknown' : data.age_seconds + 's') + ' ago. The detector may be unpowered or disconnected - do not assume the air is safe.';
+            heroIcon.innerHTML = warnIcon;
+          } else if (status === 'FAULT') {
+            banner.className = 'hero-banner warning';
+            title.innerText = 'SENSOR FAULT \u2022 CHECK MQ-2 WIRING';
+            desc.innerText = 'The MQ-2 analog signal is lost (AO wire open or sensor unpowered). Gas detection is NOT active.';
+            heroIcon.innerHTML = warnIcon;
+          } else if (status === 'DANGER') {
             banner.className = 'hero-banner danger';
             title.innerText = 'CRITICAL: GAS LEAK DETECTED';
             desc.innerText = 'High concentration of flammable gas detected! Exhaust ventilation triggered and alarm buzzer pulsing.';
@@ -1436,8 +1450,8 @@
           }
         }
 
-        document.getElementById('stream-pill').className = 'status-pill live';
-        document.getElementById('stream-label').innerText = 'LIVE HARDWARE (COM5)';
+        document.getElementById('stream-pill').className = streamLive ? 'status-pill live' : 'status-pill';
+        document.getElementById('stream-label').innerText = streamLive ? 'LIVE HARDWARE' : 'WAITING FOR DEVICE';
 
       } catch (err) {
         document.getElementById('stream-pill').className = 'status-pill';

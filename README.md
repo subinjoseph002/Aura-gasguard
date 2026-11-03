@@ -7,8 +7,9 @@ A complete, production-grade Internet-of-Things (IoT) safety sentinel engineered
 
 ## 🌟 Key Features
 
-* **High-Precision MQ-2 Gas Sensing:** Real-time analog acquisition (ADC1 GPIO 34) calibrated for flammable gases (LPG, Propane, Methane, Hydrogen, and Smoke).
-* **20-Second Smart Warmup Grace Period:** Prevents false alarms during electrochemical sensor heater stabilization.
+* **High-Precision MQ-2 Gas Sensing:** Real-time analog acquisition (ADC1 GPIO 34, GPIO 32 auto-detected) calibrated for flammable gases (LPG, Propane, Methane, Hydrogen, and Smoke).
+* **20-Second Warm-up + Measured Baseline:** Alarm is disabled while the heater stabilises; the clean-air baseline is measured at the end of warm-up (no hard-coded calibration), then tracks slow drift.
+* **Fail-safe Behaviour:** Open/unpowered sensor => `FAULT` status (red slow blink, reported to dashboard); a silent device shows `OFFLINE` instead of a stale `SAFE`.
 * **Dual Edge Alarm Actuation:** Hardware-level buzzer alerts and dual 3D animated status LEDs (Green = Safe, Red = Emergency Strobe).
 * **Containerized Microservice Architecture:** Production Dockerfile and `docker-compose.yml` with automated container healthcheck and volume persistence.
 * **Robust SQLite 3 Relational Database:** Persistent time-series logging with WAL (Write-Ahead Logging) mode, auto-directory creation, and zero-loss restart survival.
@@ -47,6 +48,7 @@ IOT Project/
 ├── README.md                      # Complete project documentation
 ├── PROJECT_REPORT.md              # Academic and technical report
 ├── CIRCUIT_DIAGRAM.md             # Hardware schematics and wiring pinout
+├── requirements.txt               # Host-side deps for serial_bridge.py (pyserial, requests)
 ├── serial_bridge.py               # Low-latency USB serial-to-REST bridge (5 Hz)
 │
 ├── backend/                       # Python Containerized Backend
@@ -62,6 +64,8 @@ IOT Project/
 ├── src/                           # ESP32 Firmware Source Code
 │   └── main.cpp                   # Sampling, alarm triggers, Wi-Fi & REST client
 └── include/                       # Embedded C++ Headers
+    ├── config.h                   # Pins, buzzer polarity, thresholds, warm-up (edit here)
+    ├── secrets.example.h          # Copy to secrets.h (git-ignored) with your Wi-Fi credentials
     └── web_dashboard.h            # On-chip presentation AP dashboard
 ```
 
@@ -75,6 +79,7 @@ The backend dynamically configures itself via environment variables:
 | :--- | :--- | :--- |
 | `PORT` | `5000` | Port for the HTTP REST server (auto-configured by Render). |
 | `DATABASE_PATH` | `/app/data/sensor_database.db` | Absolute path to SQLite file. For Render Disks, set to `/var/data/sensor_database.db`. |
+| `RETENTION_DAYS` | `14` | Readings older than this are pruned automatically. |
 | `PYTHONUNBUFFERED`| `1` | Forces real-time stdout/stderr flushing for live logs. |
 | `PYTHONDONTWRITEBYTECODE` | `1` | Prevents `.pyc` clutter inside containers. |
 
@@ -116,18 +121,19 @@ docker compose logs -f
     "device_id": "ESP32-GAS-01",
     "sensor_type": "MQ-2",
     "raw_value": 780,
-    "gas_percent": 19.0,
-    "ppm_estimated": 190,
+    "gas_percent": 1.2,
+    "ppm_estimated": 29,
     "status": "SAFE",
     "buzzer_state": 0
   }
   ```
+  `status` must be one of `SAFE`, `WARNING`, `DANGER`, `FAULT`; numeric fields are validated (`400` otherwise).
 * **Response:** `201 Created`
   ```json
   {
     "status": "success",
     "id": 142,
-    "threshold": 40
+    "threshold": 10
   }
   ```
 
@@ -162,7 +168,7 @@ docker compose logs -f
 
 ### 7. Update Alarm Threshold Setpoint
 * **Method & Path:** `POST /api/config/threshold`
-* **Request Body:** `{"threshold": 45}`
+* **Request Body:** `{"threshold": 15}` (allowed range 5-95, default 10)
 * **Response:** `200 OK`
 
 ---
@@ -209,12 +215,13 @@ docker compose logs -f
 Once your Render Web Service is deployed, copy its public URL (e.g. `https://aura-gasguard.onrender.com`).
 
 ### 1. Direct ESP32 Wi-Fi Mode
-In [`src/main.cpp`](file:///c:/Users/hp/Desktop/IOT%20Project/src/main.cpp#L48-L50), update `BACKEND_SERVER_URL`:
+Copy `include/secrets.example.h` to `include/secrets.h` and enter your Wi-Fi (the file is git-ignored):
 ```cpp
-const char* WIFI_SSID          = "Your_Home_WiFi";
-const char* WIFI_PASSWORD      = "Your_WiFi_Password";
-const char* BACKEND_SERVER_URL = "https://aura-gasguard.onrender.com/api/sensor-data";
+#define WIFI_STA_SSID     "Your_Home_WiFi"
+#define WIFI_STA_PASSWORD "Your_WiFi_Password"
 ```
+The backend URL is `BACKEND_URL` in `include/config.h`. The ESP32 uploads from its own FreeRTOS task, so a slow
+or cold-starting server never delays the alarm, and it adopts the alarm threshold set on the cloud dashboard.
 Recompile and upload using PlatformIO:
 ```bash
 pio run -t upload
@@ -226,4 +233,14 @@ If your ESP32 is connected via USB:
 $env:BACKEND_URL="https://aura-gasguard.onrender.com/api/sensor-data"
 python -u serial_bridge.py
 ```
-Hardware sensor readings from COM5 will stream straight to your live Render cloud deployment!
+The port is auto-detected (override with `SERIAL_PORT=COM5`). Readings stream straight to your Render deployment, and a
+threshold changed on the cloud dashboard is pushed back to the ESP32 over USB.
+
+---
+
+## 🔧 Troubleshooting: buzzer always on / no gas detected
+
+See [`CIRCUIT_DIAGRAM.md`](CIRCUIT_DIAGRAM.md) sections 2-4. Quick checks on the serial monitor (115200 baud):
+* `[SENSOR] ... -> using GPIO34` shows which pin the firmware believes the MQ-2 `A0` is on.
+* `Status: FAULT` => the `A0` wire is loose or the sensor has no 5 V.
+* Buzzer polarity (`BUZZER_ACTIVE_LOW`), passive vs active (`BUZZER_PASSIVE`) are set in `include/config.h`.

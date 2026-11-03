@@ -18,6 +18,10 @@ DEFAULT_DB_PATH = os.path.join(DEFAULT_DATA_DIR, "sensor_database.db")
 
 DB_PATH = os.environ.get("DATABASE_PATH", DEFAULT_DB_PATH)
 
+DEFAULT_THRESHOLD = 10        # % gas concentration that triggers the alarm (matches firmware)
+THRESHOLD_MIN, THRESHOLD_MAX = 5, 95
+RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", 14))   # readings older than this are pruned
+
 def get_connection():
     db_dir = os.path.dirname(os.path.abspath(DB_PATH))
     if db_dir:
@@ -72,8 +76,16 @@ def init_db():
     """)
 
     # Insert default configurations if not exists
-    cursor.execute("INSERT OR IGNORE INTO system_config (key, value) VALUES ('threshold', '40')")
+    cursor.execute("INSERT OR IGNORE INTO system_config (key, value) VALUES ('threshold', ?)", (str(DEFAULT_THRESHOLD),))
     cursor.execute("INSERT OR IGNORE INTO system_config (key, value) VALUES ('buzzer_muted', '0')")
+
+    # Migration v2: the alarm setpoint is 10 % (older databases still hold the old 40 % default).
+    cursor.execute("SELECT 1 FROM system_config WHERE key = 'schema_version'")
+    if not cursor.fetchone():
+        cursor.execute("UPDATE system_config SET value = ? WHERE key = 'threshold'", (str(DEFAULT_THRESHOLD),))
+        cursor.execute("INSERT INTO system_config (key, value) VALUES ('schema_version', '2')")
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_readings_ts ON sensor_readings (timestamp)")
 
     conn.commit()
     conn.close()
@@ -100,6 +112,11 @@ def insert_reading(data):
         1 if data.get("buzzer_state") else 0
     ))
     reading_id = cursor.lastrowid
+    if reading_id % 500 == 0:   # cheap periodic retention so 1 Hz telemetry cannot fill the disk
+        cursor.execute("DELETE FROM sensor_readings WHERE timestamp < datetime('now','localtime', ?)",
+                       (f"-{RETENTION_DAYS} days",))
+        cursor.execute("DELETE FROM system_events WHERE timestamp < datetime('now','localtime', ?)",
+                       (f"-{RETENTION_DAYS * 4} days",))
     conn.commit()
     conn.close()
     return reading_id

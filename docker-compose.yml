@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   gasguard-backend:
     build:
@@ -17,7 +15,6 @@ services:
       # Persistent host mount for SQLite database storage and static dashboard
       - ./backend/data:/app/data
       - ./backend/static:/app/static
-      - ./backend/app.py:/app/app.py
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 30s

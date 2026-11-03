@@ -1,4 +1,4 @@
-﻿#ifndef WEB_DASHBOARD_H
+#ifndef WEB_DASHBOARD_H
 #define WEB_DASHBOARD_H
 
 // =====================================================================================
@@ -11,7 +11,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Aura GasGuardâ„¢ â€¢ ESP32 IoT Gas Leakage Sentinel</title>
+  <title>Aura GasGuard™ • ESP32 IoT Gas Leakage Sentinel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -842,10 +842,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     <!-- Top Ambient Navigation Header -->
     <header>
       <div class="brand-group">
-        <div class="brand-icon-halo">ðŸ›¡ï¸</div>
+        <div class="brand-icon-halo">🛡ï¸</div>
         <div class="brand-text">
-          <h1>AURA GASGUARDâ„¢</h1>
-          <p>ESP32 30-Pin Sentinel â€¢ Real-Time Safety Matrix</p>
+          <h1>AURA GASGUARD™</h1>
+          <p>ESP32 30-Pin Sentinel • Real-Time Safety Matrix</p>
         </div>
       </div>
       <div class="header-pills">
@@ -854,10 +854,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           <span id="network-label">CHECKING HARDWARE...</span>
         </div>
         <div class="pill toggle-chip" id="demo-chip" onclick="toggleDemoMode()" title="Toggle simulated live gas drift">
-          <span>ðŸŽ® Demo Simulation</span>
+          <span>🎮 Demo Simulation</span>
         </div>
         <button class="audio-toggle-btn" id="audio-btn" onclick="toggleBrowserAudio()" title="Sound audible siren through browser speakers">
-          <span id="audio-icon">ðŸ”‡</span> Web Siren: Off
+          <span id="audio-icon">🔇</span> Web Siren: Off
         </button>
       </div>
     </header>
@@ -865,10 +865,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     <!-- Emergency Dynamic Status Banner -->
     <div class="hazard-banner safe" id="banner">
       <div class="hazard-info">
-        <h2 id="banner-title">ðŸŸ¢ STATUS: AIR QUALITY NORMAL</h2>
+        <h2 id="banner-title">🟢 STATUS: AIR QUALITY NORMAL</h2>
         <p id="banner-desc">Atmospheric gas concentration is within clean room baseline. No flammable hydrocarbons or combustion smoke detected.</p>
       </div>
-      <div class="hazard-badge" id="banner-emoji">âœ…</div>
+      <div class="hazard-badge" id="banner-emoji">✅</div>
     </div>
 
     <!-- Main Dynamic Content Grid -->
@@ -877,8 +877,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       <!-- Primary Gas Sensor Column -->
       <div class="card">
         <div class="card-header">
-          <div class="card-title">ðŸ”¥ Gas Concentration Matrix (MQ-2)</div>
-          <span class="pill" id="sensor-mode-pill">GPIO 34 â€¢ ADC1</span>
+          <div class="card-title">🔥 Gas Concentration Matrix (MQ-2)</div>
+          <span class="pill" id="sensor-mode-pill">GPIO 34 • ADC1</span>
         </div>
 
         <!-- Gas Type Calibration Switcher -->
@@ -912,7 +912,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           </div>
           <div class="stat-item">
             <div class="stat-label">Alarm Threshold</div>
-            <div class="stat-num" id="stat-threshold">40%</div>
+            <div class="stat-num" id="stat-threshold">10%</div>
           </div>
           <div class="stat-item">
             <div class="stat-label">Estimated PPM</div>
@@ -923,7 +923,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <!-- Real-Time Rolling History Graph -->
         <div class="slider-box" style="margin-top: 0.25rem;">
           <div class="slider-header">
-            <div class="card-title" style="font-size: 0.75rem;">ðŸ“ˆ 60-Second Real-Time Trend Wave</div>
+            <div class="card-title" style="font-size: 0.75rem;">📈 60-Second Real-Time Trend Wave</div>
             <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);" id="trend-status">Live 1Hz</span>
           </div>
           <div class="chart-box">
@@ -933,12 +933,12 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
         <!-- Safety Checklist (Revealed during alarm) -->
         <div class="safety-actions" id="safety-box">
-          <div class="safety-title">âš ï¸ Mandatory Safety Protocols:</div>
+          <div class="safety-title">⚠ï¸ Mandatory Safety Protocols:</div>
           <ul class="safety-list">
-            <li>ðŸš¨ 1. Automated exhaust ventilation active â€¢ Do NOT touch light switches or sparks</li>
-            <li>ðŸ”¥ 2. Immediately close main LPG cylinder manual shutoff valve</li>
-            <li>ðŸ’¨ 3. Open exterior windows and doors for rapid natural cross-ventilation</li>
-            <li>ðŸƒ 4. Evacuate building immediately and call Emergency Fire Services (101 / 911)</li>
+            <li>🚨 1. Automated exhaust ventilation active • Do NOT touch light switches or sparks</li>
+            <li>🔥 2. Immediately close main LPG cylinder manual shutoff valve</li>
+            <li>💨 3. Open exterior windows and doors for rapid natural cross-ventilation</li>
+            <li>🏃 4. Evacuate building immediately and call Emergency Fire Services (101 / 911)</li>
           </ul>
         </div>
       </div>
@@ -948,7 +948,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         
         <!-- Actuators Card -->
         <div class="card">
-          <div class="card-title">âš¡ Hardware Actuators & Relays</div>
+          <div class="card-title">⚡ Hardware Actuators & Relays</div>
           
           <div class="actuators-grid">
             <!-- Exhaust Fan / Solenoid Relay -->
@@ -956,12 +956,12 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
               <div class="actuator-top">
                 <div>
                   <div class="actuator-name">Exhaust Fan Relay</div>
-                  <div class="actuator-sub">GPIO 14 â€¢ 5V Coil</div>
+                  <div class="actuator-sub">GPIO 14 • 5V Coil</div>
                 </div>
                 <div class="actuator-state-badge" id="fan-badge">STANDBY</div>
               </div>
               <button class="actuator-btn" id="fan-btn" onclick="toggleFan()">
-                <span class="icon-fan" id="fan-icon">ðŸŒ€</span>
+                <span class="icon-fan" id="fan-icon">🌀</span>
                 <span id="fan-btn-text">Turn Fan ON</span>
               </button>
             </div>
@@ -971,12 +971,12 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
               <div class="actuator-top">
                 <div>
                   <div class="actuator-name">Acoustic Siren</div>
-                  <div class="actuator-sub">GPIO 25 â€¢ Intermittent</div>
+                  <div class="actuator-sub">GPIO 25 • Intermittent</div>
                 </div>
                 <div class="actuator-state-badge" id="buzzer-badge">MUTED</div>
               </div>
               <button class="actuator-btn btn-mute" id="mute-btn" onclick="toggleMute()">
-                <span id="mute-icon">ðŸ”‡</span>
+                <span id="mute-icon">🔇</span>
                 <span id="mute-btn-text">Mute Buzzer</span>
               </button>
             </div>
@@ -985,38 +985,38 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           <!-- Alarm Setpoint Adjuster -->
           <div class="slider-box" style="margin-top: 0.25rem;">
             <div class="slider-header">
-              <span class="card-title">ðŸŽ¯ Trigger Setpoint Level</span>
+              <span class="card-title">🎯 Trigger Setpoint Level</span>
               <span class="slider-val-tag" id="slider-display">40%</span>
             </div>
-            <input type="range" id="threshold-slider" min="15" max="85" value="40" oninput="onSliderMove(this.value)" onchange="sendThreshold(this.value)">
+            <input type="range" id="threshold-slider" min="5" max="90" value="10" oninput="onSliderMove(this.value)" onchange="sendThreshold(this.value)">
             <p style="font-size: 0.72rem; color: var(--text-muted);">Hysteresis deadband: Automatically silences 3% below trigger point to eliminate flutter.</p>
           </div>
 
           <!-- Diagnostic Test Alarm -->
           <button class="actuator-btn btn-alert" onclick="triggerTestAlarm()">
-            ðŸš¨ Trigger 4-Second Emergency System Drill
+            🚨 Trigger 4-Second Emergency System Drill
           </button>
         </div>
 
         <!-- Interactive Simulation Drawer (for Demos & Testing) -->
         <div class="sim-bar" id="sim-controls">
           <div class="sim-bar-header">
-            <span>ðŸ› ï¸ Interactive Gas Simulator</span>
+            <span>🛠ï¸ Interactive Gas Simulator</span>
             <span style="font-size: 0.68rem; color: var(--text-muted);" id="sim-state-text">Active for Presentation</span>
           </div>
           <div class="sim-buttons">
-            <button class="sim-btn leak" onclick="simTriggerLeak()">ðŸ’¥ Simulate Gas Leak</button>
-            <button class="sim-btn clear" onclick="simClearAtmosphere()">ðŸƒ Clear Air</button>
-            <button class="sim-btn" onclick="simStepGas(10)">âž• Gas +10%</button>
-            <button class="sim-btn" onclick="simStepGas(-10)">âž– Gas -10%</button>
+            <button class="sim-btn leak" onclick="simTriggerLeak()">💥 Simulate Gas Leak</button>
+            <button class="sim-btn clear" onclick="simClearAtmosphere()">🍃 Clear Air</button>
+            <button class="sim-btn" onclick="simStepGas(10)">➕ Gas +10%</button>
+            <button class="sim-btn" onclick="simStepGas(-10)">➖ Gas -10%</button>
           </div>
         </div>
 
         <!-- Telemetry & Event Log Card -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title">ðŸ“¡ Live System Telemetry</div>
-            <button class="gas-tag" onclick="exportEventLog()" style="padding: 0.2rem 0.5rem; font-size: 0.65rem;">ðŸ’¾ Export CSV</button>
+            <div class="card-title">📡 Live System Telemetry</div>
+            <button class="gas-tag" onclick="exportEventLog()" style="padding: 0.2rem 0.5rem; font-size: 0.65rem;">💾 Export CSV</button>
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 0.45rem; font-family: var(--font-mono); font-size: 0.76rem;">
@@ -1039,7 +1039,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           </div>
 
           <div style="margin-top: 0.4rem;">
-            <div class="card-title" style="font-size: 0.7rem; margin-bottom: 0.35rem;">ðŸ“œ Event Timeline Log</div>
+            <div class="card-title" style="font-size: 0.7rem; margin-bottom: 0.35rem;">📜 Event Timeline Log</div>
             <div class="events-box" id="events-log">
               <!-- Dynamically populated event rows -->
             </div>
@@ -1052,8 +1052,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     <!-- Telemetry System Footer -->
     <footer>
       <div class="footer-left">
-        <span>âš¡ ESP32 GasGuard Firmware v2.5</span>
-        <span>â€¢</span>
+        <span>⚡ ESP32 GasGuard Firmware v2.5</span>
+        <span>•</span>
         <span>ADC1 Continuous Sampling</span>
       </div>
       <div>
@@ -1215,10 +1215,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       
       const label = document.getElementById('gas-level-label');
       if (clamped >= currentThreshold) {
-        label.innerText = 'ðŸ”¥ CRITICAL GAS LEAK';
+        label.innerText = '🔥 CRITICAL GAS LEAK';
         label.style.color = 'var(--color-danger)';
       } else if (clamped >= currentThreshold * 0.75) {
-        label.innerText = 'âš ï¸ ELEVATED LEVEL';
+        label.innerText = '⚠ï¸ ELEVATED LEVEL';
         label.style.color = 'var(--color-warn)';
       } else {
         label.innerText = 'ATMOSPHERE NOMINAL';
@@ -1251,13 +1251,13 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       isWebAudioEnabled = !isWebAudioEnabled;
       const btn = document.getElementById('audio-btn');
       if (isWebAudioEnabled) {
-        btn.innerHTML = '<span id="audio-icon">ðŸ”Š</span> Web Siren: ON';
+        btn.innerHTML = '<span id="audio-icon">🔊</span> Web Siren: ON';
         btn.style.color = 'var(--color-safe)';
         btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
         playBeep(880, 0.15);
         logEvent('Browser acoustic siren enabled', 'info');
       } else {
-        btn.innerHTML = '<span id="audio-icon">ðŸ”‡</span> Web Siren: Off';
+        btn.innerHTML = '<span id="audio-icon">🔇</span> Web Siren: Off';
         btn.style.color = 'var(--text-secondary)';
         btn.style.borderColor = 'var(--border-subtle)';
         logEvent('Browser acoustic siren disabled', 'info');
@@ -1360,30 +1360,39 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       const emoji = document.getElementById('banner-emoji');
       const safety = document.getElementById('safety-box');
 
+      if (data.status === 'FAULT') {
+        banner.className = 'hazard-banner warning';
+        title.innerHTML = '\u26a0\ufe0f SENSOR FAULT: CHECK MQ-2 WIRING';
+        desc.innerText = 'The MQ-2 analog signal is lost (AO wire open or sensor unpowered). Gas detection is NOT active.';
+        emoji.innerText = '\u26a0\ufe0f';
+        safety.className = 'safety-actions';
+        prevStatus = data.status;
+        return;
+      }
       banner.className = 'hazard-banner ' + data.status.toLowerCase();
       if (data.status === 'DANGER') {
-        title.innerHTML = 'ðŸ”´ DANGER: GAS LEAKAGE DETECTED!';
+        title.innerHTML = '🔴 DANGER: GAS LEAKAGE DETECTED!';
         desc.innerText = 'Critical gas concentration detected! Siren sounding and automated exhaust ventilation active.';
-        emoji.innerText = 'ðŸ”¥';
+        emoji.innerText = '🔥';
         safety.className = 'safety-actions active';
         if (prevStatus !== 'DANGER') {
-          logEvent(`ðŸš¨ CRITICAL ALARM TRIGGERED (${data.gasPercent.toFixed(1)}%)`, 'alarm');
+          logEvent(`🚨 CRITICAL ALARM TRIGGERED (${data.gasPercent.toFixed(1)}%)`, 'alarm');
         }
       } else if (data.status === 'WARNING') {
-        title.innerHTML = 'ðŸŸ¡ WARNING: ELEVATED GAS CONCENTRATION';
+        title.innerHTML = '🟡 WARNING: ELEVATED GAS CONCENTRATION';
         desc.innerText = 'Sensor level is approaching critical threshold. Monitor environment and maintain airflow.';
-        emoji.innerText = 'âš ï¸';
+        emoji.innerText = '⚠ï¸';
         safety.className = 'safety-actions';
         if (prevStatus !== 'WARNING' && prevStatus !== 'DANGER') {
-          logEvent(`âš ï¸ Elevated Gas Warning (${data.gasPercent.toFixed(1)}%)`, 'info');
+          logEvent(`⚠ï¸ Elevated Gas Warning (${data.gasPercent.toFixed(1)}%)`, 'info');
         }
       } else {
-        title.innerHTML = 'ðŸŸ¢ STATUS: AIR QUALITY NORMAL';
+        title.innerHTML = '🟢 STATUS: AIR QUALITY NORMAL';
         desc.innerText = 'Atmospheric gas concentration is within clean room baseline. No flammable gas or combustion smoke detected.';
-        emoji.innerText = 'âœ…';
+        emoji.innerText = '✅';
         safety.className = 'safety-actions';
         if (prevStatus === 'DANGER' || prevStatus === 'WARNING') {
-          logEvent('âœ… Air cleared: Atmosphere returned to Normal', 'safe');
+          logEvent('✅ Air cleared: Atmosphere returned to Normal', 'safe');
         }
       }
       prevStatus = data.status;
@@ -1510,13 +1519,13 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         btn.className = 'actuator-btn btn-mute';
         btn.style.background = '#475569';
         text.innerText = 'Unmute Buzzer';
-        icon.innerText = 'ðŸ”Š';
+        icon.innerText = '🔊';
         logEvent('Audible siren buzzer MUTED', 'info');
       } else {
         btn.className = 'actuator-btn btn-mute';
         btn.style.background = '#334155';
         text.innerText = 'Mute Buzzer';
-        icon.innerText = 'ðŸ”‡';
+        icon.innerText = '🔇';
         logEvent('Audible siren buzzer UNMUTED', 'info');
       }
 
@@ -1528,7 +1537,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
 
     async function triggerTestAlarm() {
-      logEvent('ðŸš¨ Manual 4-Second Emergency Drill initiated', 'alarm');
+      logEvent('🚨 Manual 4-Second Emergency Drill initiated', 'alarm');
       if (isDemoMode) {
         demoManualHold = true;
         demoGas = 82.0;
@@ -1546,7 +1555,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
 
     // Initial system boot
-    logEvent('System dashboard loaded â€¢ Ready', 'info');
+    logEvent('System dashboard loaded • Ready', 'info');
     fetchStatus();
     setInterval(fetchStatus, 1000);
   </script>

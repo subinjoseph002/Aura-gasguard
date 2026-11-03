@@ -10,7 +10,6 @@ Runs natively via `python app.py` or inside Docker container via `docker-compose
 """
 
 import http.server
-import socketserver
 import urllib.parse
 import json
 import os
@@ -20,7 +19,8 @@ from datetime import datetime
 from database import (
     init_db, insert_reading, insert_event, get_latest_reading,
     get_recent_readings, get_statistics, get_recent_events,
-    get_config, set_config, get_connection, DB_PATH
+    get_config, set_config, get_connection, DB_PATH,
+    DEFAULT_THRESHOLD, THRESHOLD_MIN, THRESHOLD_MAX
 )
 
 HOST = "0.0.0.0"
@@ -33,6 +33,18 @@ init_db()
 
 # Track previous status for edge-triggered alarm event logging
 prev_device_status = {}
+
+# A device that has not reported for this long is shown as OFFLINE (never as a stale "SAFE").
+OFFLINE_AFTER_SECONDS = 15
+
+def current_threshold():
+    return int(get_config("threshold", DEFAULT_THRESHOLD))
+
+def reading_age_seconds(timestamp):
+    try:
+        return max(0, int((datetime.now() - datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")).total_seconds()))
+    except (TypeError, ValueError):
+        return None
 
 class BackendRouter(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -84,9 +96,11 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
         # 1. Latest Reading API
         if path == "/api/sensor-data/latest":
             latest = get_latest_reading()
-            threshold = int(get_config("threshold", 40))
+            threshold = current_threshold()
             if latest:
                 latest["threshold"] = threshold
+                latest["age_seconds"] = reading_age_seconds(latest["timestamp"])
+                latest["offline"] = latest["age_seconds"] is None or latest["age_seconds"] > OFFLINE_AFTER_SECONDS
                 self.send_json(200, latest)
             else:
                 self.send_json(200, {
@@ -99,11 +113,14 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
 
         # 2. Historical Chart Data API
         elif path == "/api/sensor-data/history":
-            limit = int(query.get("limit", [60])[0])
+            try:
+                limit = int(query.get("limit", [60])[0])
+            except ValueError:
+                limit = 60
             readings = get_recent_readings(min(120, max(10, limit)))
             self.send_json(200, {
                 "count": len(readings),
-                "threshold": int(get_config("threshold", 40)),
+                "threshold": current_threshold(),
                 "readings": readings
             })
             return
@@ -151,9 +168,10 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
                 return
 
         # Serve static assets (CSS, JS, images)
-        clean_path = parsed.path.lstrip("/")
-        target_file = os.path.join(STATIC_DIR, clean_path)
-        if os.path.exists(target_file) and os.path.isfile(target_file):
+        clean_path = urllib.parse.unquote(parsed.path).lstrip("/")
+        target_file = os.path.realpath(os.path.join(STATIC_DIR, clean_path))
+        inside_static = os.path.commonpath([os.path.realpath(STATIC_DIR), target_file]) == os.path.realpath(STATIC_DIR)
+        if inside_static and os.path.isfile(target_file):
             content_type = "text/plain"
             if target_file.endswith(".html"): content_type = "text/html"
             elif target_file.endswith(".css"): content_type = "text/css"
@@ -175,8 +193,11 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/")
-        length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length).decode("utf-8") if length > 0 else ""
+        try:
+            length = min(int(self.headers.get("Content-Length", 0)), 65536)
+        except ValueError:
+            length = 0
+        body = self.rfile.read(length).decode("utf-8", errors="replace") if length > 0 else ""
 
         payload = {}
         if body:
@@ -191,10 +212,19 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
                 self.send_json(400, {"error": "Invalid JSON payload"})
                 return
 
-            device_id = payload.get("device_id", "ESP32-GAS-01")
-            status = payload.get("status", "SAFE")
-            gas_pct = float(payload.get("gas_percent", 0.0))
-            raw_val = int(payload.get("raw_value", 0))
+            try:
+                device_id = str(payload.get("device_id", "ESP32-GAS-01"))[:64]
+                status = str(payload.get("status", "SAFE")).upper()
+                gas_pct = float(payload.get("gas_percent", 0.0))
+                raw_val = int(payload.get("raw_value", 0))
+                int(payload.get("ppm_estimated", 0))
+            except (TypeError, ValueError):
+                self.send_json(400, {"error": "gas_percent, raw_value and ppm_estimated must be numeric"})
+                return
+            if status not in ("SAFE", "WARNING", "DANGER", "FAULT"):
+                self.send_json(400, {"error": "status must be SAFE, WARNING, DANGER or FAULT"})
+                return
+            payload["status"] = status
 
             # Insert into database
             row_id = insert_reading(payload)
@@ -203,12 +233,16 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
             prev_status = prev_device_status.get(device_id, "SAFE")
             if status == "DANGER" and prev_status != "DANGER":
                 insert_event("ALARM_TRIGGERED", f"🚨 Gas leak detected by {device_id}: {gas_pct:.1f}% (ADC: {raw_val})", "CRITICAL")
-            elif status == "SAFE" and prev_status == "DANGER":
+            elif status != "DANGER" and prev_status == "DANGER":
                 insert_event("ALARM_CLEARED", f"✅ Gas concentration cleared on {device_id}: {gas_pct:.1f}%", "INFO")
+            if status == "FAULT" and prev_status != "FAULT":
+                insert_event("SENSOR_FAULT", f"⚠️ {device_id}: MQ-2 signal lost - check the AO wire and 5V supply", "WARNING")
+            elif status != "FAULT" and prev_status == "FAULT":
+                insert_event("SENSOR_RECOVERED", f"MQ-2 signal restored on {device_id}", "INFO")
             prev_device_status[device_id] = status
 
             # Return response to ESP32 with current threshold
-            threshold = int(get_config("threshold", 40))
+            threshold = current_threshold()
 
             self.send_json(201, {
                 "status": "success",
@@ -219,15 +253,16 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
 
         # 2. UPDATE ALARM THRESHOLD
         elif path == "/api/config/threshold":
-            val = payload.get("threshold")
-            if val is not None:
-                val = int(val)
-                if 10 <= val <= 95:
-                    set_config("threshold", val)
-                    insert_event("CONFIG_CHANGE", f"Alarm setpoint updated to {val}%", "INFO")
-                    self.send_json(200, {"status": "success", "threshold": val})
-                    return
-            self.send_json(400, {"error": "Invalid threshold value (10-95)"})
+            try:
+                val = int(payload.get("threshold"))
+            except (TypeError, ValueError):
+                val = None
+            if val is not None and THRESHOLD_MIN <= val <= THRESHOLD_MAX:
+                set_config("threshold", val)
+                insert_event("CONFIG_CHANGE", f"Alarm setpoint updated to {val}%", "INFO")
+                self.send_json(200, {"status": "success", "threshold": val})
+                return
+            self.send_json(400, {"error": f"Invalid threshold value ({THRESHOLD_MIN}-{THRESHOLD_MAX})"})
             return
 
         # 3. EMERGENCY SYSTEM TEST DRILL
@@ -244,18 +279,21 @@ class BackendRouter(http.server.SimpleHTTPRequestHandler):
             cursor.execute("DELETE FROM sqlite_sequence WHERE name='sensor_readings'")
             cursor.execute("DELETE FROM system_events")
             cursor.execute("DELETE FROM sqlite_sequence WHERE name='system_events'")
-            cursor.execute("UPDATE system_config SET value='40' WHERE key='threshold'")
+            cursor.execute("UPDATE system_config SET value=? WHERE key='threshold'", (str(DEFAULT_THRESHOLD),))
             cursor.execute("UPDATE system_config SET value='0' WHERE key='buzzer_muted'")
             conn.commit()
             conn.close()
+            prev_device_status.clear()
             self.send_json(200, {"status": "success", "message": "Database cleared successfully"})
             return
 
         self.send_json(404, {"error": "Endpoint not found"})
 
 def run_server():
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer((HOST, PORT), BackendRouter) as httpd:
+    # Threaded: one slow browser/cold TLS client must never block ESP32 telemetry.
+    http.server.ThreadingHTTPServer.allow_reuse_address = True
+    http.server.ThreadingHTTPServer.daemon_threads = True
+    with http.server.ThreadingHTTPServer((HOST, PORT), BackendRouter) as httpd:
         print("=" * 70)
         print("  AURA GASGUARD — CONTAINERIZED IOT BACKEND & DATABASE")
         print("=" * 70)

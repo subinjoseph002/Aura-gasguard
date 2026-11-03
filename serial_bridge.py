@@ -43,22 +43,32 @@ TELEMETRY_PATTERN = re.compile(
 )
 
 def find_esp32_port():
+    """SERIAL_PORT env var wins; otherwise prefer known ESP32 USB-UART bridge chips."""
+    forced = os.environ.get("SERIAL_PORT")
+    if forced:
+        return forced
     ports = list(serial.tools.list_ports.comports())
-    for p in ports:
-        desc = (p.description or "").lower()
-        if "cp210" in desc or "ch340" in desc or "usb" in desc or "uart" in desc:
-            return p.device
-    if ports:
-        return ports[0].device
-    return "COM5"
+    for keywords in (("cp210", "ch340", "ch910", "ftdi"), ("usb", "uart")):
+        for p in ports:
+            text = f"{p.description or ''} {p.manufacturer or ''}".lower()
+            if any(k in text for k in keywords):
+                return p.device
+    return ports[0].device if ports else "COM5"
+
+LAST_ERROR = ""
 
 def post_to_backend(payload):
+    """POST one reading. Returns (ok, backend_threshold or None)."""
+    global LAST_ERROR
     if USE_REQUESTS:
         try:
-            resp = HTTP_SESSION.post(BACKEND_URL, json=payload, timeout=3.0)
-            return resp.status_code in (200, 201)
+            resp = HTTP_SESSION.post(BACKEND_URL, json=payload, timeout=10.0)
+            ok = resp.status_code in (200, 201)
+            LAST_ERROR = "" if ok else f"HTTP {resp.status_code}"
+            return ok, (resp.json().get("threshold") if ok else None)
         except Exception as e:
-            return False
+            LAST_ERROR = type(e).__name__
+            return False, None
     else:
         try:
             req = urllib.request.Request(
@@ -66,10 +76,12 @@ def post_to_backend(payload):
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(req, timeout=3.0) as resp:
-                return resp.status in (200, 201)
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                ok = resp.status in (200, 201)
+                return ok, (json.loads(resp.read()).get("threshold") if ok else None)
         except Exception as e:
-            return False
+            LAST_ERROR = type(e).__name__
+            return False, None
 
 def main():
     port = find_esp32_port()
@@ -84,6 +96,7 @@ def main():
     ser = None
     count = 0
     warn_printed = False
+    last_pushed_threshold = None
 
     while True:
         try:
@@ -125,10 +138,16 @@ def main():
                     "threshold": threshold
                 }
 
-                ok = post_to_backend(payload)
+                ok, backend_threshold = post_to_backend(payload)
                 count += 1
-                status_icon = "🔴" if status == "DANGER" else ("🟡" if status == "WARNING" else "🟢")
-                print(f"[{count:04d}] {status_icon} Gas: {gas_pct:5.1f}% | ADC: {raw_adc:4d} | Status: {status:7s} | Cloud Sync: {'OK' if ok else 'RETRY'}", flush=True)
+                # Cloud dashboard owns the alarm setpoint: push changes down to the ESP32 over USB.
+                if (isinstance(backend_threshold, int) and backend_threshold != threshold
+                        and backend_threshold != last_pushed_threshold):
+                    last_pushed_threshold = backend_threshold
+                    ser.write(f"T{backend_threshold}\n".encode())
+                    print(f"[CONFIG] Pushed threshold {backend_threshold}% to ESP32", flush=True)
+                status_icon = {"DANGER": "🔴", "WARNING": "🟡", "FAULT": "⚪"}.get(status, "🟢")
+                print(f"[{count:04d}] {status_icon} Gas: {gas_pct:5.1f}% | ADC: {raw_adc:4d} | Status: {status:7s} | Cloud Sync: {'OK' if ok else 'RETRY (' + LAST_ERROR + ')'}", flush=True)
 
             elif "[WARMUP]" in line:
                 print(f"  {line}", flush=True)
